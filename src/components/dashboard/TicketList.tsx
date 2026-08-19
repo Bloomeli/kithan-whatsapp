@@ -5,9 +5,9 @@ import type { Ticket, TicketPriority, User } from '../../types'
 import { CreateTicketModal } from './CreateTicketModal'
 
 const PRIORITY_DOT: Record<TicketPriority, string> = {
-  emergency: 'bg-emergency shadow-[0_0_10px_#ff1a1a]',
-  urgent: 'bg-urgent shadow-[0_0_10px_#ff5f1f]',
-  standard: 'bg-standard shadow-[0_0_10px_#ffe500]',
+  emergency: 'bg-emergency shadow-[0_0_12px_#ff1a1a]',
+  urgent: 'bg-urgent shadow-[0_0_12px_#ff5f1f]',
+  standard: 'bg-standard shadow-[0_0_12px_#ffe500]',
 }
 
 const PRIORITY_BAR: Record<TicketPriority, string> = {
@@ -18,15 +18,25 @@ const PRIORITY_BAR: Record<TicketPriority, string> = {
 
 interface TicketListProps {
   currentUser: User
+  showArchived?: boolean
+  createOpen?: boolean
+  onCreateOpenChange?: (open: boolean) => void
   onSelectTicket?: (ticket: Ticket) => void
+  onCreatedActive?: () => void
 }
 
-export function TicketList({ currentUser, onSelectTicket }: TicketListProps) {
+export function TicketList({
+  currentUser,
+  showArchived = false,
+  createOpen = false,
+  onCreateOpenChange,
+  onSelectTicket,
+  onCreatedActive,
+}: TicketListProps) {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -36,7 +46,7 @@ export function TicketList({ currentUser, onSelectTicket }: TicketListProps) {
       setError(null)
 
       const { tickets: nextTickets, error: queryError } =
-        await fetchTicketsForMember(currentUser.id)
+        await fetchTicketsForMember(currentUser.id, showArchived)
 
       if (cancelled) return
 
@@ -55,7 +65,7 @@ export function TicketList({ currentUser, onSelectTicket }: TicketListProps) {
     return () => {
       cancelled = true
     }
-  }, [currentUser.id])
+  }, [currentUser.id, showArchived])
 
   function handleSelect(ticket: Ticket) {
     setSelectedId(ticket.id)
@@ -74,17 +84,20 @@ export function TicketList({ currentUser, onSelectTicket }: TicketListProps) {
 
       {!loading && !error && tickets.length === 0 ? (
         <p className="px-4 py-12 text-center text-sm text-neutral-400">
-          Keine aktiven Problemräume.
+          {showArchived
+            ? 'Keine archivierten Problemräume.'
+            : 'Keine aktiven Problemräume.'}
         </p>
       ) : null}
 
       {!loading && tickets.length > 0 ? (
-        <ul className="flex-1 overflow-y-auto pb-24">
+        <ul className="flex-1 overflow-y-auto pb-6">
           {tickets.map((ticket) => (
             <li key={ticket.id}>
               <TicketRow
                 ticket={ticket}
                 selected={ticket.id === selectedId}
+                archived={showArchived}
                 onSelect={handleSelect}
               />
             </li>
@@ -92,21 +105,13 @@ export function TicketList({ currentUser, onSelectTicket }: TicketListProps) {
         </ul>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setCreateOpen(true)}
-        aria-label="Neues Ticket erstellen"
-        className="absolute right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-3xl font-light text-white shadow-[0_4px_16px_rgba(26,107,255,0.45)]"
-      >
-        +
-      </button>
-
       {createOpen ? (
         <CreateTicketModal
           currentUser={currentUser}
-          onClose={() => setCreateOpen(false)}
+          onClose={() => onCreateOpenChange?.(false)}
           onCreated={(ticket) => {
-            setCreateOpen(false)
+            onCreateOpenChange?.(false)
+            onCreatedActive?.()
             handleSelect(ticket)
           }}
         />
@@ -118,10 +123,12 @@ export function TicketList({ currentUser, onSelectTicket }: TicketListProps) {
 function TicketRow({
   ticket,
   selected,
+  archived,
   onSelect,
 }: {
   ticket: Ticket
   selected: boolean
+  archived: boolean
   onSelect: (ticket: Ticket) => void
 }) {
   const statusText = ticket.status
@@ -139,12 +146,18 @@ function TicketRow({
     >
       <span
         aria-hidden
-        className={`w-1 shrink-0 ${PRIORITY_BAR[ticket.priority]}`}
+        className={`w-1.5 shrink-0 ${
+          archived ? 'bg-archive shadow-[0_0_10px_#aff903]' : PRIORITY_BAR[ticket.priority]
+        }`}
       />
-      <span className="flex min-w-0 flex-1 items-center gap-3 border-b border-neutral-800 px-3 py-3.5">
+      <span className="flex min-w-0 flex-1 items-center gap-3 border-b border-neutral-800 px-3 py-3.5 pr-4">
         <span
           aria-hidden
-          className={`h-3 w-3 shrink-0 rounded-full ${PRIORITY_DOT[ticket.priority]}`}
+          className={`h-3.5 w-3.5 shrink-0 rounded-full ${
+            archived
+              ? 'bg-archive shadow-[0_0_12px_#aff903]'
+              : PRIORITY_DOT[ticket.priority]
+          }`}
         />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-semibold text-white">

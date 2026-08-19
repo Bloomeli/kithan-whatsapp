@@ -12,6 +12,8 @@ html,
 body,
 #root {
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   background: #000;
   color: #fff;
 }
@@ -24,4 +26,20 @@ body {
     Roboto,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+input[type='checkbox'],
+input[type='radio'],
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'],
+select {
+  accent-color: #1a6bff;
+}
+
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'],
+select {
+  color-scheme: dark;
 }

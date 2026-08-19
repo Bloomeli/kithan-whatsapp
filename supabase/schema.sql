@@ -12,8 +12,12 @@ create type public.ticket_priority as enum ('emergency', 'urgent', 'standard');
 
 create type public.ticket_status as enum (
   'open',
+  'under_review',
   'in_progress',
+  'needs_consultation',
   'waiting',
+  'waiting_for_tenant',
+  'waiting_for_parts',
   'done'
 );
 
@@ -46,6 +50,12 @@ create table public.tickets (
   created_by uuid not null references public.users (id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  building_id text,
+  building_label text,
+  unit_location text,
+  tenant_name text,
+  occurred_at timestamptz,
+  reported_by text,
   constraint tickets_title_not_empty check (char_length(trim(title)) > 0)
 );
 
@@ -54,8 +64,14 @@ create index tickets_created_by_idx on public.tickets (created_by);
 create index tickets_created_at_idx on public.tickets (created_at desc);
 
 comment on table public.tickets is 'Problemräume. archived = true verschiebt das Ticket in den Archiv-Bereich.';
-comment on column public.tickets.status is 'Multi-Select: ein Ticket kann mehrere Statuswerte gleichzeitig haben.';
+comment on column public.tickets.status is 'Arbeits-Status als Array. Die UI speichert in der Regel einen Wert. Archiv läuft über archived, nicht über diesen Enum.';
 comment on column public.tickets.archived is 'true = Archiv (Neongrün-Markierung in der UI), false = aktive Liste.';
+comment on column public.tickets.building_id is 'Objekt-ID aus der Vermietungs-App (Wohnung/Einheit).';
+comment on column public.tickets.building_label is 'Adress-Label zum Zeitpunkt der Erstellung.';
+comment on column public.tickets.unit_location is 'Wohnungsnummer / Lage innerhalb des Gebäudes.';
+comment on column public.tickets.tenant_name is 'Name der/des Mieter(s).';
+comment on column public.tickets.occurred_at is 'Datum und Uhrzeit, wann das Problem passiert ist.';
+comment on column public.tickets.reported_by is 'Wer das Problem gemeldet hat.';
 
 -- ---------------------------------------------------------------------------
 -- ticket_members — Zuordnung Mitarbeiter ↔ Ticket (n:m)

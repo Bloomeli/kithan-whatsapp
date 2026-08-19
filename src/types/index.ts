@@ -1,6 +1,14 @@
 export type TicketPriority = 'emergency' | 'urgent' | 'standard'
 
-export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'done'
+export type TicketStatus =
+  | 'open'
+  | 'under_review'
+  | 'in_progress'
+  | 'needs_consultation'
+  | 'waiting'
+  | 'waiting_for_tenant'
+  | 'waiting_for_parts'
+  | 'done'
 
 export type MediaType = 'image' | 'video'
 
@@ -20,6 +28,12 @@ export type Ticket = {
   created_by: string
   created_at: string
   updated_at: string
+  building_id: string | null
+  building_label: string | null
+  unit_location: string | null
+  tenant_name: string | null
+  occurred_at: string | null
+  reported_by: string | null
 }
 
 export type TicketMember = {
@@ -59,6 +73,12 @@ export type TicketInsert = {
   created_by: string
   created_at?: string
   updated_at?: string
+  building_id?: string | null
+  building_label?: string | null
+  unit_location?: string | null
+  tenant_name?: string | null
+  occurred_at?: string | null
+  reported_by?: string | null
 }
 
 export type TicketUpdate = {
@@ -68,6 +88,12 @@ export type TicketUpdate = {
   status?: TicketStatus[]
   archived?: boolean
   updated_at?: string
+  building_id?: string | null
+  building_label?: string | null
+  unit_location?: string | null
+  tenant_name?: string | null
+  occurred_at?: string | null
+  reported_by?: string | null
 }
 
 export type TicketMemberInsert = {

@@ -108,8 +108,8 @@ export function AddMembersModal({
                   className="flex w-full items-center justify-between px-1 py-3 text-left disabled:opacity-40"
                 >
                   <span className="text-sm font-medium">{user.name}</span>
-                  <span className="text-xs text-primary">
-                    {already ? 'Dabei' : savingId === user.id ? '…' : 'Hinzufügen'}
+                  <span className="text-xl font-light leading-none text-primary">
+                    {already ? '✓' : savingId === user.id ? '…' : '+'}
                   </span>
                 </button>
               </li>

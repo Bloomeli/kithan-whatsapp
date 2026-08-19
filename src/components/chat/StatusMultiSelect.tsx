@@ -24,7 +24,7 @@ export function StatusMultiSelect({
   }
 
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+    <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch]">
       {TICKET_STATUSES.map((status) => {
         const active = selected.has(status)
         return (
@@ -33,7 +33,7 @@ export function StatusMultiSelect({
             type="button"
             disabled={disabled}
             onClick={() => toggle(status)}
-            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition ${
               active
                 ? 'bg-primary text-white'
                 : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'

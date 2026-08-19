@@ -2,11 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { prepareChatMedia, uploadChatMedia } from '../../lib/media'
 import { supabase } from '../../lib/supabase'
 import { fetchAccessibleTicket } from '../../lib/tickets'
-import type { Message, Ticket, TicketMember, TicketStatus, User } from '../../types'
+import type {
+  Message,
+  Ticket,
+  TicketMember,
+  TicketPriority,
+  TicketStatus,
+  User,
+} from '../../types'
 import { AddMembersModal } from './AddMembersModal'
 import { ChatComposer } from './ChatComposer'
 import { MessageList } from './MessageList'
-import { StatusMultiSelect } from './StatusMultiSelect'
+import { TicketMetaSelect } from './TicketMetaSelect'
 
 interface TicketRoomProps {
   ticket: Ticket
@@ -24,7 +31,6 @@ export function TicketRoom({
   const [messages, setMessages] = useState<Message[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [members, setMembers] = useState<TicketMember[]>([])
-  const [status, setStatus] = useState<TicketStatus[]>(ticket.status)
   const [addOpen, setAddOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [statusText, setStatusText] = useState<string | null>(null)
@@ -102,23 +108,55 @@ export function TicketRoom({
     }
   }, [ticket.id, currentUser.id, onBack])
 
-  async function handleStatusChange(next: TicketStatus[]) {
-    const previous = status
-    setStatus(next)
+  const currentStatus = ticket.status[0] ?? 'open'
+
+  async function handleStatusChange(next: TicketStatus) {
     const { data, error: updateError } = await supabase
       .from('tickets')
-      .update({ status: next })
+      .update({ status: [next], archived: false })
       .eq('id', ticket.id)
       .select()
       .single()
 
     if (updateError || !data) {
       setError('Status konnte nicht gespeichert werden.')
-      setStatus(previous)
       return
     }
 
     onTicketUpdated(data)
+  }
+
+  async function handlePriorityChange(next: TicketPriority) {
+    const { data, error: updateError } = await supabase
+      .from('tickets')
+      .update({ priority: next })
+      .eq('id', ticket.id)
+      .select()
+      .single()
+
+    if (updateError || !data) {
+      setError('Dringlichkeit konnte nicht gespeichert werden.')
+      return
+    }
+
+    onTicketUpdated(data)
+  }
+
+  async function handleArchive() {
+    const { data, error: updateError } = await supabase
+      .from('tickets')
+      .update({ archived: true, status: ['done'] })
+      .eq('id', ticket.id)
+      .select()
+      .single()
+
+    if (updateError || !data) {
+      setError('Archivieren ist fehlgeschlagen.')
+      return
+    }
+
+    onTicketUpdated(data)
+    onBack()
   }
 
   async function handleSend(text: string, file: File | null) {
@@ -197,7 +235,15 @@ export function TicketRoom({
           </button>
         </div>
         <div className="px-2 pt-1">
-          <StatusMultiSelect value={status} onChange={handleStatusChange} />
+          <TicketMetaSelect
+            status={currentStatus}
+            priority={ticket.priority}
+            archived={ticket.archived}
+            onStatusChange={(next) => void handleStatusChange(next)}
+            onPriorityChange={(next) => void handlePriorityChange(next)}
+            onArchive={() => void handleArchive()}
+          />
+          <TicketIncidentSummary ticket={ticket} />
         </div>
       </header>
 
@@ -258,4 +304,38 @@ function BackIcon() {
       />
     </svg>
   )
+}
+
+function TicketIncidentSummary({ ticket }: { ticket: Ticket }) {
+  const lines = [
+    ticket.building_label,
+    ticket.unit_location,
+    ticket.tenant_name ? `Mieter: ${ticket.tenant_name}` : null,
+    ticket.occurred_at ? `Wann: ${formatOccurredAt(ticket.occurred_at)}` : null,
+    ticket.reported_by ? `Gemeldet von: ${ticket.reported_by}` : null,
+  ].filter((line): line is string => Boolean(line))
+
+  if (lines.length === 0) return null
+
+  return (
+    <div className="mt-2 space-y-0.5 text-[12px] leading-snug text-neutral-400">
+      {lines.map((line) => (
+        <p key={line} className="truncate">
+          {line}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+function formatOccurredAt(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }

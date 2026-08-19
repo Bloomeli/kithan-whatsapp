@@ -77,7 +77,7 @@ export function LoginDropdown({ onSelect }: LoginDropdownProps) {
   }
 
   return (
-    <div className="flex min-h-svh w-full items-center justify-center bg-black px-4 py-8 text-white">
+    <div className="flex min-h-svh w-full items-center justify-center bg-black px-4 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] text-white">
       <form
         onSubmit={handleSubmit}
         className="flex w-full max-w-sm flex-col gap-6"
@@ -91,6 +91,10 @@ export function LoginDropdown({ onSelect }: LoginDropdownProps) {
           </h1>
           <p className="mt-2 text-sm text-neutral-400">
             Mitarbeiter auswählen, um fortzufahren.
+          </p>
+          <p className="mt-3 text-xs leading-relaxed text-neutral-500">
+            Zum Home-Bildschirm: auf dem iPhone Teilen → „Zum Home-Bildschirm“.
+            Auf Android: Menü → „App installieren“.
           </p>
         </header>
 

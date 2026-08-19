@@ -1,13 +1,12 @@
 import { supabase } from './supabase'
-import type { Ticket, TicketStatus } from '../types'
+import type { Ticket, TicketPriority, TicketStatus } from '../types'
 
 const TICKET_COLUMNS =
-  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at'
-
-const OPEN_STATUS: TicketStatus[] = ['open']
+  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by'
 
 export async function fetchTicketsForMember(
   userId: string,
+  archived = false,
 ): Promise<{ tickets: Ticket[]; error: string | null }> {
   const { data: memberships, error: memberError } = await supabase
     .from('ticket_members')
@@ -29,7 +28,7 @@ export async function fetchTicketsForMember(
   const { data, error } = await supabase
     .from('tickets')
     .select(TICKET_COLUMNS)
-    .eq('archived', false)
+    .eq('archived', archived)
     .in('id', ticketIds)
     .order('updated_at', { ascending: false })
 
@@ -63,11 +62,20 @@ export async function fetchAccessibleTicket(
   return data
 }
 
-export async function createTicketForUser(
-  title: string,
-  userId: string,
-): Promise<{ ticket: Ticket | null; error: string | null }> {
-  const trimmed = title.trim()
+export async function createTicketForUser(input: {
+  title: string
+  userId: string
+  priority: TicketPriority
+  status: TicketStatus
+  memberIds: string[]
+  buildingId: string
+  buildingLabel: string
+  unitLocation: string
+  tenantName: string
+  occurredAt: string
+  reportedBy: string
+}): Promise<{ ticket: Ticket | null; error: string | null }> {
+  const trimmed = input.title.trim()
   if (!trimmed) {
     return { ticket: null, error: 'Bitte einen Titel eingeben.' }
   }
@@ -76,8 +84,15 @@ export async function createTicketForUser(
     .from('tickets')
     .insert({
       title: trimmed,
-      created_by: userId,
-      status: OPEN_STATUS,
+      created_by: input.userId,
+      priority: input.priority,
+      status: [input.status],
+      building_id: input.buildingId,
+      building_label: input.buildingLabel,
+      unit_location: input.unitLocation.trim() || null,
+      tenant_name: input.tenantName.trim() || null,
+      occurred_at: input.occurredAt,
+      reported_by: input.reportedBy.trim() || null,
     })
     .select(TICKET_COLUMNS)
     .single()
@@ -86,16 +101,19 @@ export async function createTicketForUser(
     return { ticket: null, error: 'Problemraum konnte nicht erstellt werden.' }
   }
 
-  const { error: memberError } = await supabase.from('ticket_members').insert({
-    ticket_id: ticket.id,
-    user_id: userId,
-  })
+  const uniqueMemberIds = [...new Set([input.userId, ...input.memberIds])]
+  const { error: memberError } = await supabase.from('ticket_members').insert(
+    uniqueMemberIds.map((userId) => ({
+      ticket_id: ticket.id,
+      user_id: userId,
+    })),
+  )
 
   if (memberError) {
     await supabase.from('tickets').delete().eq('id', ticket.id)
     return {
       ticket: null,
-      error: 'Problemraum konnte nicht mit deinem Konto verknüpft werden.',
+      error: 'Problemraum konnte nicht mit den Mitgliedern verknüpft werden.',
     }
   }
 
