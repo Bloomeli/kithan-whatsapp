@@ -5,8 +5,15 @@ import { CHAT_MEDIA_BUCKET, type MediaType } from '../types'
 const MAX_IMAGE_EDGE = 1920
 const IMAGE_QUALITY = 0.8
 const MAX_VIDEO_EDGE = 1080
+export const MAX_VIDEO_SECONDS = 30
+export const VIDEO_BITRATE = 2_500_000
 const MAX_VIDEO_PASSTHROUGH_BYTES = 12 * 1024 * 1024
-const VIDEO_BITRATE = 2_500_000
+const VIDEO_DURATION_EPSILON = 0.05
+
+export async function isVideoOverTimeLimit(file: File): Promise<boolean> {
+  const duration = await readVideoDuration(file)
+  return isDurationOverLimit(duration)
+}
 
 export async function prepareChatMedia(file: File): Promise<{
   file: File
@@ -67,20 +74,22 @@ async function compressVideo(file: File): Promise<File> {
 
   try {
     await waitForVideoMetadata(video)
+    const overLimit = isDurationOverLimit(video.duration)
 
     const sourceEdge = Math.max(video.videoWidth, video.videoHeight)
     const alreadyHd =
       sourceEdge <= MAX_VIDEO_EDGE && file.size <= MAX_VIDEO_PASSTHROUGH_BYTES
 
-    if (alreadyHd) {
+    if (alreadyHd && !overLimit) {
       return file
     }
 
-    const scale = Math.min(1, MAX_VIDEO_EDGE / sourceEdge)
-    const width = even(Math.round(video.videoWidth * scale))
-    const height = even(Math.round(video.videoHeight * scale))
+    const scale = Math.min(1, MAX_VIDEO_EDGE / Math.max(sourceEdge, 1))
+    const width = even(Math.round(video.videoWidth * scale)) || 2
+    const height = even(Math.round(video.videoHeight * scale)) || 2
 
     const recorded = await recordScaledVideo(video, width, height)
+    if (overLimit) return recorded
     return recorded.size < file.size ? recorded : file
   } finally {
     URL.revokeObjectURL(objectUrl)
@@ -109,7 +118,7 @@ async function recordScaledVideo(
     ...(audioTrack ? [audioTrack] : []),
   ]
   const stream = new MediaStream(tracks)
-  const mimeType = pickRecorderMime()
+  const mimeType = pickChatRecorderMime()
 
   const chunks: BlobPart[] = []
   const recorder = new MediaRecorder(stream, {
@@ -148,7 +157,11 @@ async function recordScaledVideo(
 
   await video.play()
   draw()
-  await waitForEvent(video, 'ended')
+  await Promise.race([
+    waitForEvent(video, 'ended'),
+    waitForTimeout(MAX_VIDEO_SECONDS * 1000),
+  ])
+  if (!video.paused && !video.ended) video.pause()
   if (recorder.state !== 'inactive') recorder.stop()
   return finished
 }
@@ -165,7 +178,7 @@ async function captureVideoAudio(video: HTMLVideoElement): Promise<MediaStreamTr
   }
 }
 
-function pickRecorderMime() {
+export function pickChatRecorderMime() {
   const candidates = [
     'video/mp4;codecs=avc1',
     'video/webm;codecs=vp9,opus',
@@ -181,6 +194,34 @@ function canvasSupportsWebp() {
   canvas.width = 1
   canvas.height = 1
   return canvas.toDataURL('image/webp').startsWith('data:image/webp')
+}
+
+function isDurationOverLimit(duration: number) {
+  return Number.isFinite(duration) && duration > MAX_VIDEO_SECONDS + VIDEO_DURATION_EPSILON
+}
+
+async function readVideoDuration(file: File): Promise<number> {
+  const objectUrl = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.preload = 'metadata'
+  video.muted = true
+  video.playsInline = true
+  video.src = objectUrl
+
+  try {
+    await waitForVideoMetadata(video)
+    return video.duration
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+    video.removeAttribute('src')
+    video.load()
+  }
+}
+
+function waitForTimeout(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
 }
 
 function waitForVideoMetadata(video: HTMLVideoElement) {

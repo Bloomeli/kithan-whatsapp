@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import type { MediaType, Message } from '../../types'
 
 interface MessageBubbleProps {
@@ -44,24 +45,89 @@ export function MessageBubble({ message, authorName, isOwn }: MessageBubbleProps
 
 function MediaAttachment({ url, type }: { url: string; type: MediaType }) {
   if (type === 'video') {
-    return (
-      <video
-        src={url}
-        controls
-        playsInline
-        className="mb-1 max-h-64 w-full rounded-lg bg-black"
-      />
-    )
+    return <VideoPreview url={url} />
+  }
+
+  return <ImagePreview url={url} />
+}
+
+function ImagePreview({ url }: { url: string }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mb-1 block w-full overflow-hidden rounded-lg"
+        aria-label="Foto vergrößern"
+      >
+        <img
+          src={url}
+          alt="Foto"
+          className="max-h-64 w-full object-cover"
+        />
+      </button>
+      {open ? (
+        <div
+          role="dialog"
+          aria-label="Foto"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <img
+            src={url}
+            alt="Foto"
+            className="max-h-full max-w-full object-contain"
+          />
+        </div>
+      ) : null}
+    </>
+  )
+}
+
+function VideoPreview({ url }: { url: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [playing, setPlaying] = useState(false)
+
+  function startPlayback() {
+    setPlaying(true)
+    void videoRef.current?.play()
   }
 
   return (
-    <a href={url} target="_blank" rel="noreferrer">
-      <img
+    <div className="relative mb-1 overflow-hidden rounded-lg bg-black">
+      <video
+        ref={videoRef}
         src={url}
-        alt="Anhang"
-        className="mb-1 max-h-64 w-full rounded-lg object-cover"
+        playsInline
+        preload="metadata"
+        controls={playing}
+        className="max-h-64 w-full"
+        onPlay={() => setPlaying(true)}
+        onEnded={() => setPlaying(false)}
       />
-    </a>
+      {playing ? null : (
+        <button
+          type="button"
+          onClick={startPlayback}
+          aria-label="Video abspielen"
+          className="absolute inset-0 flex items-center justify-center bg-black/35"
+        >
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-[0_0_12px_rgba(26,107,255,0.55)]">
+            <PlayIcon />
+          </span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7 translate-x-0.5" fill="currentColor" aria-hidden>
+      <path d="M8 5.5v13l11-6.5z" />
+    </svg>
   )
 }
 
