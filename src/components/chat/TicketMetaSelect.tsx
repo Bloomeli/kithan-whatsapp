@@ -18,6 +18,7 @@ interface TicketMetaSelectProps {
   onStatusChange: (status: TicketStatus) => void
   onPriorityChange: (priority: TicketPriority) => void
   onArchive?: () => void
+  onDelete?: () => void
 }
 
 export function TicketMetaSelect({
@@ -28,6 +29,7 @@ export function TicketMetaSelect({
   onStatusChange,
   onPriorityChange,
   onArchive,
+  onDelete,
 }: TicketMetaSelectProps) {
   const statusOptions = TICKET_STATUSES.includes(status)
     ? TICKET_STATUSES
@@ -63,15 +65,28 @@ export function TicketMetaSelect({
         />
       </div>
 
-      {onArchive ? (
+      {onArchive && !archived ? (
         <div className="flex justify-end">
           <button
             type="button"
-            disabled={disabled || archived}
+            disabled={disabled}
             onClick={onArchive}
             className="h-11 w-1/4 rounded-xl border border-archive/50 bg-archive/10 px-1 text-[11px] font-semibold leading-tight text-archive transition hover:bg-archive/20 disabled:opacity-40"
           >
-            {archived ? 'Bereits archiviert' : 'Archivieren'}
+            Archivieren
+          </button>
+        </div>
+      ) : null}
+
+      {onDelete && archived ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onDelete}
+            className="h-11 w-1/4 rounded-xl border border-red-500/40 bg-red-500/10 px-1 text-[11px] font-semibold leading-tight text-red-300 transition hover:bg-red-500/20 disabled:opacity-40"
+          >
+            Löschen
           </button>
         </div>
       ) : null}

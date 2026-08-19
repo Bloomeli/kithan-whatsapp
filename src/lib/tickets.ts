@@ -1,8 +1,11 @@
 import { supabase } from './supabase'
-import type { Ticket, TicketPriority, TicketStatus } from '../types'
+import { CHAT_MEDIA_BUCKET, type Ticket, type TicketPriority, type TicketStatus } from '../types'
 
 const TICKET_COLUMNS =
-  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by'
+  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, archived_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by'
+
+export const ARCHIVE_DELETE_AFTER_DAYS = 14
+const ARCHIVE_DELETE_AFTER_MS = ARCHIVE_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000
 
 export async function fetchTicketsForMember(
   userId: string,
@@ -118,6 +121,99 @@ export async function createTicketForUser(input: {
   }
 
   return { ticket, error: null }
+}
+
+export async function updateTicketDetails(input: {
+  ticketId: string
+  title: string
+  priority: TicketPriority
+  status: TicketStatus
+  buildingId: string
+  buildingLabel: string
+  unitLocation: string
+  tenantName: string
+  occurredAt: string
+  reportedBy: string
+}): Promise<{ ticket: Ticket | null; error: string | null }> {
+  const trimmed = input.title.trim()
+  if (!trimmed) {
+    return { ticket: null, error: 'Bitte einen Titel eingeben.' }
+  }
+
+  const { data: ticket, error } = await supabase
+    .from('tickets')
+    .update({
+      title: trimmed,
+      priority: input.priority,
+      status: [input.status],
+      building_id: input.buildingId,
+      building_label: input.buildingLabel,
+      unit_location: input.unitLocation.trim() || null,
+      tenant_name: input.tenantName.trim() || null,
+      occurred_at: input.occurredAt,
+      reported_by: input.reportedBy.trim() || null,
+    })
+    .eq('id', input.ticketId)
+    .select(TICKET_COLUMNS)
+    .single()
+
+  if (error || !ticket) {
+    return { ticket: null, error: 'Änderungen konnten nicht gespeichert werden.' }
+  }
+
+  return { ticket, error: null }
+}
+
+export async function deleteTicketCompletely(
+  ticketId: string,
+): Promise<{ error: string | null }> {
+  const { data: files } = await supabase.storage
+    .from(CHAT_MEDIA_BUCKET)
+    .list(ticketId, { limit: 100 })
+
+  if (files && files.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from(CHAT_MEDIA_BUCKET)
+      .remove(files.map((file) => `${ticketId}/${file.name}`))
+
+    if (storageError) {
+      return { error: 'Dateien auf dem Server konnten nicht gelöscht werden.' }
+    }
+  }
+
+  const { error } = await supabase.from('tickets').delete().eq('id', ticketId)
+  if (error) {
+    return { error: 'Problemraum konnte nicht gelöscht werden.' }
+  }
+
+  return { error: null }
+}
+
+export function needsArchiveDeleteReminder(ticket: Ticket): boolean {
+  if (!ticket.archived) return false
+  const start = ticket.archived_at ?? ticket.updated_at
+  const at = new Date(start).getTime()
+  if (Number.isNaN(at)) return false
+  return Date.now() - at >= ARCHIVE_DELETE_AFTER_MS
+}
+
+export function isoToDateInput(iso: string | null): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function isoToTimeInput(iso: string | null): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 const TICKET_HASH_PATTERN =

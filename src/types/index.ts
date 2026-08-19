@@ -28,6 +28,7 @@ export type Ticket = {
   created_by: string
   created_at: string
   updated_at: string
+  archived_at: string | null
   building_id: string | null
   building_label: string | null
   unit_location: string | null
@@ -73,6 +74,7 @@ export type TicketInsert = {
   created_by: string
   created_at?: string
   updated_at?: string
+  archived_at?: string | null
   building_id?: string | null
   building_label?: string | null
   unit_location?: string | null
@@ -88,6 +90,7 @@ export type TicketUpdate = {
   status?: TicketStatus[]
   archived?: boolean
   updated_at?: string
+  archived_at?: string | null
   building_id?: string | null
   building_label?: string | null
   unit_location?: string | null
@@ -194,7 +197,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      purge_expired_chat_media: {
+        Args: Record<string, never>
+        Returns: number
+      }
     }
     Enums: {
       ticket_priority: TicketPriority

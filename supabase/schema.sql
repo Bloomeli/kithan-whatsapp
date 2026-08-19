@@ -50,6 +50,7 @@ create table public.tickets (
   created_by uuid not null references public.users (id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  archived_at timestamptz,
   building_id text,
   building_label text,
   unit_location text,
@@ -66,6 +67,7 @@ create index tickets_created_at_idx on public.tickets (created_at desc);
 comment on table public.tickets is 'Problemräume. archived = true verschiebt das Ticket in den Archiv-Bereich.';
 comment on column public.tickets.status is 'Arbeits-Status als Array. Die UI speichert in der Regel einen Wert. Archiv läuft über archived, nicht über diesen Enum.';
 comment on column public.tickets.archived is 'true = Archiv (Neongrün-Markierung in der UI), false = aktive Liste.';
+comment on column public.tickets.archived_at is 'Zeitpunkt der Archivierung. Nach 14 Tagen erinnert die UI zum manuellen Löschen.';
 comment on column public.tickets.building_id is 'Objekt-ID aus der Vermietungs-App (Wohnung/Einheit).';
 comment on column public.tickets.building_label is 'Adress-Label zum Zeitpunkt der Erstellung.';
 comment on column public.tickets.unit_location is 'Wohnungsnummer / Lage innerhalb des Gebäudes.';
@@ -103,7 +105,7 @@ create table public.messages (
   media_type text,
   created_at timestamptz not null default now(),
   constraint messages_has_body check (
-    char_length(trim(content)) > 0 or media_url is not null
+    char_length(trim(content)) > 0 or media_url is not null or media_type is not null
   ),
   constraint messages_media_type_check check (
     media_type is null or media_type in ('image', 'video')
@@ -116,7 +118,7 @@ create index messages_ticket_created_at_idx on public.messages (ticket_id, creat
 
 comment on table public.messages is 'Nachrichten gehören immer zu genau einer ticket_id.';
 comment on column public.messages.media_url is 'Öffentliche URL im Storage-Bucket chat-media.';
-comment on column public.messages.media_type is 'image oder video; null = reine Textnachricht.';
+comment on column public.messages.media_type is 'image oder video; null = reine Textnachricht. Bleibt nach Ablauf der 36-Stunden-Löschung erhalten.';
 
 -- ---------------------------------------------------------------------------
 -- updated_at automatisch setzen
@@ -195,6 +197,38 @@ create policy chat_media_insert
   on storage.objects for insert
   to anon, authenticated
   with check (bucket_id = 'chat-media');
+
+create policy chat_media_delete
+  on storage.objects for delete
+  to anon, authenticated
+  using (bucket_id = 'chat-media');
+
+-- Vorläufig: Fotos/Videos nach 36 Stunden löschen (Speicherlimit).
+create or replace function public.purge_expired_chat_media()
+returns integer
+language plpgsql
+security definer
+set search_path = public, storage
+as $$
+declare
+  updated_count integer;
+begin
+  delete from storage.objects
+  where bucket_id = 'chat-media'
+    and created_at < now() - interval '36 hours';
+
+  update public.messages
+  set media_url = null
+  where media_url is not null
+    and created_at < now() - interval '36 hours';
+
+  get diagnostics updated_count = row_count;
+  return updated_count;
+end;
+$$;
+
+revoke all on function public.purge_expired_chat_media() from public;
+grant execute on function public.purge_expired_chat_media() to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Mitarbeiter anlegen (Namen im Dashboard jederzeit anpassbar)

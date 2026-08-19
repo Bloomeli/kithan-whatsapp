@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { prepareChatMedia, uploadChatMedia } from '../../lib/media'
 import { supabase } from '../../lib/supabase'
-import { fetchAccessibleTicket } from '../../lib/tickets'
+import { deleteTicketCompletely, fetchAccessibleTicket } from '../../lib/tickets'
 import type {
   Message,
   Ticket,
@@ -10,6 +10,8 @@ import type {
   TicketStatus,
   User,
 } from '../../types'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
+import { EditTicketModal } from '../dashboard/EditTicketModal'
 import { AddMembersModal } from './AddMembersModal'
 import { ChatComposer } from './ChatComposer'
 import { MessageList } from './MessageList'
@@ -35,6 +37,12 @@ export function TicketRoom({
   const [sending, setSending] = useState(false)
   const [statusText, setStatusText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirmArchive, setConfirmArchive] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [actionBusy, setActionBusy] = useState(false)
+  const longPressRef = useRef(false)
+  const titleTimerRef = useRef<number | null>(null)
 
   const usersById = useMemo(
     () => new Map(users.map((user) => [user.id, user])),
@@ -143,12 +151,20 @@ export function TicketRoom({
   }
 
   async function handleArchive() {
+    setActionBusy(true)
     const { data, error: updateError } = await supabase
       .from('tickets')
-      .update({ archived: true, status: ['done'] })
+      .update({
+        archived: true,
+        status: ['done'],
+        archived_at: new Date().toISOString(),
+      })
       .eq('id', ticket.id)
       .select()
       .single()
+
+    setActionBusy(false)
+    setConfirmArchive(false)
 
     if (updateError || !data) {
       setError('Archivieren ist fehlgeschlagen.')
@@ -156,6 +172,20 @@ export function TicketRoom({
     }
 
     onTicketUpdated(data)
+    onBack()
+  }
+
+  async function handleDelete() {
+    setActionBusy(true)
+    const { error: deleteError } = await deleteTicketCompletely(ticket.id)
+    setActionBusy(false)
+    setConfirmDelete(false)
+
+    if (deleteError) {
+      setError(deleteError)
+      return
+    }
+
     onBack()
   }
 
@@ -222,7 +252,32 @@ export function TicketRoom({
           >
             <BackIcon />
           </button>
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
+          <h1
+            className="min-w-0 flex-1 truncate text-base font-semibold select-none"
+            onPointerDown={() => {
+              longPressRef.current = false
+              if (titleTimerRef.current !== null) {
+                window.clearTimeout(titleTimerRef.current)
+              }
+              titleTimerRef.current = window.setTimeout(() => {
+                longPressRef.current = true
+                setEditOpen(true)
+              }, 550)
+            }}
+            onPointerUp={() => {
+              if (titleTimerRef.current !== null) {
+                window.clearTimeout(titleTimerRef.current)
+                titleTimerRef.current = null
+              }
+            }}
+            onPointerCancel={() => {
+              if (titleTimerRef.current !== null) {
+                window.clearTimeout(titleTimerRef.current)
+                titleTimerRef.current = null
+              }
+            }}
+            onContextMenu={(event) => event.preventDefault()}
+          >
             {ticket.title}
           </h1>
           <button
@@ -241,7 +296,8 @@ export function TicketRoom({
             archived={ticket.archived}
             onStatusChange={(next) => void handleStatusChange(next)}
             onPriorityChange={(next) => void handlePriorityChange(next)}
-            onArchive={() => void handleArchive()}
+            onArchive={() => setConfirmArchive(true)}
+            onDelete={ticket.archived ? () => setConfirmDelete(true) : undefined}
           />
           <TicketIncidentSummary ticket={ticket} />
         </div>
@@ -286,6 +342,40 @@ export function TicketRoom({
               setUsers((current) => [...current, user])
             }
           }}
+        />
+      ) : null}
+
+      {editOpen ? (
+        <EditTicketModal
+          ticket={ticket}
+          onClose={() => setEditOpen(false)}
+          onSaved={(next) => {
+            onTicketUpdated(next)
+            setEditOpen(false)
+          }}
+        />
+      ) : null}
+
+      {confirmArchive ? (
+        <ConfirmDialog
+          title="Archivieren"
+          message="Wollen Sie den Problemraum wirklich archivieren?"
+          confirmLabel="Archivieren"
+          busy={actionBusy}
+          onCancel={() => setConfirmArchive(false)}
+          onConfirm={() => void handleArchive()}
+        />
+      ) : null}
+
+      {confirmDelete ? (
+        <ConfirmDialog
+          title="Löschen"
+          message="Wollen Sie wirklich die Datei löschen?"
+          confirmLabel="Löschen"
+          danger
+          busy={actionBusy}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => void handleDelete()}
         />
       ) : null}
     </div>

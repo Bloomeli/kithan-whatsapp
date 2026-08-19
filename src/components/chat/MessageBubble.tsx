@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { isChatMediaExpired, MEDIA_TTL_HOURS } from '../../lib/mediaTtl'
 import type { MediaType, Message } from '../../types'
 
 interface MessageBubbleProps {
@@ -22,8 +23,20 @@ export function MessageBubble({ message, authorName, isOwn }: MessageBubbleProps
             {authorName}
           </p>
         )}
-        {message.media_url && message.media_type ? (
+        {message.media_url && message.media_type && !isChatMediaExpired(message.created_at) ? (
           <MediaAttachment url={message.media_url} type={message.media_type} />
+        ) : null}
+        {message.media_type &&
+        (!message.media_url || isChatMediaExpired(message.created_at)) ? (
+          <p
+            className={`mb-1 text-[12px] leading-snug ${
+              isOwn ? 'text-white/70' : 'text-neutral-400'
+            }`}
+          >
+            {message.media_type === 'video'
+              ? `Video nach ${MEDIA_TTL_HOURS} Stunden gelöscht`
+              : `Foto nach ${MEDIA_TTL_HOURS} Stunden gelöscht`}
+          </p>
         ) : null}
         {message.content.trim() ? (
           <p className="whitespace-pre-wrap break-words text-[15px] leading-snug">

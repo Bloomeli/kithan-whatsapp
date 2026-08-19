@@ -7,6 +7,7 @@ import {
 import { TicketRoom } from './components/chat/TicketRoom'
 import { TicketList } from './components/dashboard/TicketList'
 import { OfflineBanner } from './components/OfflineBanner'
+import { purgeExpiredChatMedia } from './lib/mediaTtl'
 import {
   fetchAccessibleTicket,
   parseTicketHash,
@@ -21,6 +22,11 @@ function App() {
   const [showArchived, setShowArchived] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+
+  useEffect(() => {
+    if (!currentUser) return
+    void purgeExpiredChatMedia()
+  }, [currentUser])
 
   useEffect(() => {
     if (!currentUser) return
