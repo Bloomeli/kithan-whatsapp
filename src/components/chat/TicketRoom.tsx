@@ -1,0 +1,261 @@
+import { useEffect, useMemo, useState } from 'react'
+import { prepareChatMedia, uploadChatMedia } from '../../lib/media'
+import { supabase } from '../../lib/supabase'
+import { fetchAccessibleTicket } from '../../lib/tickets'
+import type { Message, Ticket, TicketMember, TicketStatus, User } from '../../types'
+import { AddMembersModal } from './AddMembersModal'
+import { ChatComposer } from './ChatComposer'
+import { MessageList } from './MessageList'
+import { StatusMultiSelect } from './StatusMultiSelect'
+
+interface TicketRoomProps {
+  ticket: Ticket
+  currentUser: User
+  onBack: () => void
+  onTicketUpdated: (ticket: Ticket) => void
+}
+
+export function TicketRoom({
+  ticket,
+  currentUser,
+  onBack,
+  onTicketUpdated,
+}: TicketRoomProps) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [members, setMembers] = useState<TicketMember[]>([])
+  const [status, setStatus] = useState<TicketStatus[]>(ticket.status)
+  const [addOpen, setAddOpen] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [statusText, setStatusText] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const usersById = useMemo(
+    () => new Map(users.map((user) => [user.id, user])),
+    [users],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadRoom() {
+      const accessible = await fetchAccessibleTicket(ticket.id, currentUser.id)
+      if (cancelled) return
+
+      if (!accessible) {
+        onBack()
+        return
+      }
+
+      const [messagesResult, usersResult, membersResult] = await Promise.all([
+        supabase
+          .from('messages')
+          .select(
+            'id, ticket_id, user_id, content, media_url, media_type, created_at',
+          )
+          .eq('ticket_id', ticket.id)
+          .order('created_at', { ascending: true }),
+        supabase.from('users').select('id, name, created_at'),
+        supabase
+          .from('ticket_members')
+          .select('id, ticket_id, user_id, added_at')
+          .eq('ticket_id', ticket.id),
+      ])
+
+      if (cancelled) return
+
+      if (messagesResult.error || usersResult.error || membersResult.error) {
+        setError('Problemraum konnte nicht geladen werden.')
+        return
+      }
+
+      setMessages(messagesResult.data ?? [])
+      setUsers(usersResult.data ?? [])
+      setMembers(membersResult.data ?? [])
+    }
+
+    void loadRoom()
+
+    const channel = supabase
+      .channel(`ticket-messages-${ticket.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `ticket_id=eq.${ticket.id}`,
+        },
+        (payload) => {
+          const incoming = payload.new as Message
+          setMessages((current) => {
+            if (current.some((entry) => entry.id === incoming.id)) return current
+            return [...current, incoming]
+          })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      cancelled = true
+      void supabase.removeChannel(channel)
+    }
+  }, [ticket.id, currentUser.id, onBack])
+
+  async function handleStatusChange(next: TicketStatus[]) {
+    const previous = status
+    setStatus(next)
+    const { data, error: updateError } = await supabase
+      .from('tickets')
+      .update({ status: next })
+      .eq('id', ticket.id)
+      .select()
+      .single()
+
+    if (updateError || !data) {
+      setError('Status konnte nicht gespeichert werden.')
+      setStatus(previous)
+      return
+    }
+
+    onTicketUpdated(data)
+  }
+
+  async function handleSend(text: string, file: File | null) {
+    setSending(true)
+    setError(null)
+    setStatusText(file ? 'Medium wird vorbereitet…' : null)
+
+    try {
+      let mediaUrl: string | null = null
+      let mediaType: Message['media_type'] = null
+
+      if (file) {
+        const prepared = await prepareChatMedia(file)
+        setStatusText('Upload läuft…')
+        mediaUrl = await uploadChatMedia(ticket.id, prepared.file)
+        mediaType = prepared.mediaType
+      }
+
+      const { data, error: insertError } = await supabase
+        .from('messages')
+        .insert({
+          ticket_id: ticket.id,
+          user_id: currentUser.id,
+          content: text.trim(),
+          media_url: mediaUrl,
+          media_type: mediaType,
+        })
+        .select(
+          'id, ticket_id, user_id, content, media_url, media_type, created_at',
+        )
+        .single()
+
+      if (insertError || !data) {
+        throw new Error('Nachricht konnte nicht gesendet werden.')
+      }
+
+      setMessages((current) => {
+        if (current.some((entry) => entry.id === data.id)) return current
+        return [...current, data]
+      })
+    } catch (sendError) {
+      setError(
+        sendError instanceof Error
+          ? sendError.message
+          : 'Senden ist fehlgeschlagen.',
+      )
+      throw sendError
+    } finally {
+      setSending(false)
+      setStatusText(null)
+    }
+  }
+
+  return (
+    <div className="flex h-svh flex-col bg-black text-white">
+      <header className="border-b border-neutral-800 bg-neutral-950 px-2 pb-3 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Zurück zur Liste"
+            className="flex h-11 w-11 shrink-0 items-center justify-center text-primary"
+          >
+            <BackIcon />
+          </button>
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
+            {ticket.title}
+          </h1>
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            aria-label="Mitarbeiter hinzufügen"
+            className="flex h-11 w-11 shrink-0 items-center justify-center text-2xl font-light text-primary"
+          >
+            +
+          </button>
+        </div>
+        <div className="px-2 pt-1">
+          <StatusMultiSelect value={status} onChange={handleStatusChange} />
+        </div>
+      </header>
+
+      {error ? (
+        <p className="mx-3 mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <MessageList
+          messages={messages}
+          usersById={usersById}
+          currentUserId={currentUser.id}
+        />
+      </div>
+
+      <ChatComposer
+        sending={sending}
+        statusText={statusText}
+        onSend={handleSend}
+      />
+
+      {addOpen ? (
+        <AddMembersModal
+          ticketId={ticket.id}
+          memberIds={members.map((member) => member.user_id)}
+          onClose={() => setAddOpen(false)}
+          onAdded={(user) => {
+            setMembers((current) => [
+              ...current,
+              {
+                id: crypto.randomUUID(),
+                ticket_id: ticket.id,
+                user_id: user.id,
+                added_at: new Date().toISOString(),
+              },
+            ])
+            if (!usersById.has(user.id)) {
+              setUsers((current) => [...current, user])
+            }
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function BackIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
+      <path
+        d="M15 5 8 12l7 7"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

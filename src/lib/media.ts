@@ -1,0 +1,225 @@
+import imageCompression from 'browser-image-compression'
+import { supabase } from './supabase'
+import { CHAT_MEDIA_BUCKET, type MediaType } from '../types'
+
+const MAX_IMAGE_EDGE = 1920
+const IMAGE_QUALITY = 0.8
+const MAX_VIDEO_EDGE = 1080
+const MAX_VIDEO_PASSTHROUGH_BYTES = 12 * 1024 * 1024
+const VIDEO_BITRATE = 2_500_000
+
+export async function prepareChatMedia(file: File): Promise<{
+  file: File
+  mediaType: MediaType
+}> {
+  if (file.type.startsWith('image/')) {
+    return { file: await compressImage(file), mediaType: 'image' }
+  }
+
+  if (file.type.startsWith('video/')) {
+    return { file: await compressVideo(file), mediaType: 'video' }
+  }
+
+  throw new Error('Nur Fotos und Videos können hochgeladen werden.')
+}
+
+export async function uploadChatMedia(ticketId: string, file: File): Promise<string> {
+  const extension = extensionFromFile(file)
+  const path = `${ticketId}/${crypto.randomUUID()}.${extension}`
+
+  const { error } = await supabase.storage.from(CHAT_MEDIA_BUCKET).upload(path, file, {
+    contentType: file.type || undefined,
+    upsert: false,
+  })
+
+  if (error) {
+    throw new Error('Datei konnte nicht in den Speicher geladen werden.')
+  }
+
+  const { data } = supabase.storage.from(CHAT_MEDIA_BUCKET).getPublicUrl(path)
+  return data.publicUrl
+}
+
+async function compressImage(file: File): Promise<File> {
+  const fileType = canvasSupportsWebp() ? 'image/webp' : 'image/jpeg'
+
+  const compressed = await imageCompression(file, {
+    maxWidthOrHeight: MAX_IMAGE_EDGE,
+    initialQuality: IMAGE_QUALITY,
+    maxSizeMB: 1.6,
+    fileType,
+    useWebWorker: true,
+  })
+
+  return new File([compressed], renameExtension(file.name, fileType), {
+    type: fileType,
+    lastModified: Date.now(),
+  })
+}
+
+async function compressVideo(file: File): Promise<File> {
+  const objectUrl = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.src = objectUrl
+  video.muted = true
+  video.playsInline = true
+  video.preload = 'metadata'
+
+  try {
+    await waitForVideoMetadata(video)
+
+    const sourceEdge = Math.max(video.videoWidth, video.videoHeight)
+    const alreadyHd =
+      sourceEdge <= MAX_VIDEO_EDGE && file.size <= MAX_VIDEO_PASSTHROUGH_BYTES
+
+    if (alreadyHd) {
+      return file
+    }
+
+    const scale = Math.min(1, MAX_VIDEO_EDGE / sourceEdge)
+    const width = even(Math.round(video.videoWidth * scale))
+    const height = even(Math.round(video.videoHeight * scale))
+
+    const recorded = await recordScaledVideo(video, width, height)
+    return recorded.size < file.size ? recorded : file
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+    video.removeAttribute('src')
+    video.load()
+  }
+}
+
+async function recordScaledVideo(
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+): Promise<File> {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Video konnte nicht verarbeitet werden.')
+  }
+
+  const videoStream = canvas.captureStream(30)
+  const audioTrack = await captureVideoAudio(video)
+  const tracks = [
+    ...videoStream.getVideoTracks(),
+    ...(audioTrack ? [audioTrack] : []),
+  ]
+  const stream = new MediaStream(tracks)
+  const mimeType = pickRecorderMime()
+
+  const chunks: BlobPart[] = []
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: VIDEO_BITRATE,
+  })
+
+  const finished = new Promise<File>((resolve, reject) => {
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data)
+    }
+    recorder.onerror = () => reject(new Error('Video-Komprimierung ist fehlgeschlagen.'))
+    recorder.onstop = () => {
+      audioTrack?.stop()
+      videoStream.getTracks().forEach((track) => track.stop())
+      const blob = new Blob(chunks, { type: mimeType })
+      const extension = mimeType.includes('mp4') ? 'mp4' : 'webm'
+      resolve(
+        new File([blob], `video.${extension}`, {
+          type: mimeType,
+          lastModified: Date.now(),
+        }),
+      )
+    }
+  })
+
+  video.currentTime = 0
+  await waitForEvent(video, 'seeked')
+  recorder.start(250)
+
+  const draw = () => {
+    if (video.paused || video.ended) return
+    context.drawImage(video, 0, 0, width, height)
+    requestAnimationFrame(draw)
+  }
+
+  await video.play()
+  draw()
+  await waitForEvent(video, 'ended')
+  if (recorder.state !== 'inactive') recorder.stop()
+  return finished
+}
+
+async function captureVideoAudio(video: HTMLVideoElement): Promise<MediaStreamTrack | null> {
+  try {
+    const audioContext = new AudioContext()
+    const source = audioContext.createMediaElementSource(video)
+    const destination = audioContext.createMediaStreamDestination()
+    source.connect(destination)
+    return destination.stream.getAudioTracks()[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+function pickRecorderMime() {
+  const candidates = [
+    'video/mp4;codecs=avc1',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+  ]
+
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? 'video/webm'
+}
+
+function canvasSupportsWebp() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  return canvas.toDataURL('image/webp').startsWith('data:image/webp')
+}
+
+function waitForVideoMetadata(video: HTMLVideoElement) {
+  if (video.readyState >= 1) return Promise.resolve()
+  return waitForEvent(video, 'loadedmetadata')
+}
+
+function waitForEvent(target: EventTarget, eventName: string) {
+  return new Promise<void>((resolve, reject) => {
+    const onSuccess = () => {
+      target.removeEventListener('error', onError)
+      resolve()
+    }
+    const onError = () => {
+      target.removeEventListener(eventName, onSuccess)
+      reject(new Error('Medium konnte nicht gelesen werden.'))
+    }
+    target.addEventListener(eventName, onSuccess, { once: true })
+    target.addEventListener('error', onError, { once: true })
+  })
+}
+
+function even(value: number) {
+  return value % 2 === 0 ? value : value - 1
+}
+
+function extensionFromFile(file: File) {
+  if (file.type === 'image/webp') return 'webp'
+  if (file.type === 'image/jpeg') return 'jpg'
+  if (file.type === 'image/png') return 'png'
+  if (file.type.includes('mp4')) return 'mp4'
+  if (file.type.includes('webm')) return 'webm'
+  const fromName = file.name.split('.').pop()?.toLowerCase()
+  return fromName && fromName.length <= 5 ? fromName : 'bin'
+}
+
+function renameExtension(name: string, mime: string) {
+  const base = name.replace(/\.[^.]+$/, '') || 'foto'
+  if (mime === 'image/webp') return `${base}.webp`
+  if (mime === 'image/jpeg') return `${base}.jpg`
+  return name
+}
