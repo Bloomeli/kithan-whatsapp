@@ -46,9 +46,9 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={`h-12 flex-1 rounded-xl text-sm font-semibold text-white disabled:opacity-40 ${
+            className={`h-12 flex-1 rounded-xl text-sm font-semibold disabled:opacity-40 ${
               danger
-                ? 'bg-red-600 hover:bg-red-500'
+                ? 'bg-red-600 text-white hover:bg-red-500'
                 : 'bg-archive text-black hover:bg-archive/90'
             }`}
           >

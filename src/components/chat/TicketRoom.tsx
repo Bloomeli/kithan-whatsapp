@@ -167,7 +167,7 @@ export function TicketRoom({
     setConfirmArchive(false)
 
     if (updateError || !data) {
-      setError('Archivieren ist fehlgeschlagen.')
+      setError('Abschließen ist fehlgeschlagen.')
       return
     }
 
@@ -358,9 +358,9 @@ export function TicketRoom({
 
       {confirmArchive ? (
         <ConfirmDialog
-          title="Archivieren"
-          message="Wollen Sie den Problemraum wirklich archivieren?"
-          confirmLabel="Archivieren"
+          title="Problem abschließen"
+          message="Wollen Sie den Problemraum wirklich abschließen?"
+          confirmLabel="Abschließen"
           busy={actionBusy}
           onCancel={() => setConfirmArchive(false)}
           onConfirm={() => void handleArchive()}

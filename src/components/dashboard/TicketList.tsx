@@ -277,7 +277,7 @@ function TicketRow({
         </span>
       </button>
       {onDelete ? (
-        <div className="flex items-center border-b border-neutral-800 pr-2">
+        <div className="flex items-center border-b border-neutral-800 pr-6">
           <button
             type="button"
             onClick={() => onDelete(ticket)}

@@ -115,25 +115,51 @@ function App() {
   return (
     <div className="flex min-h-svh flex-col bg-black text-white">
       <OfflineBanner />
-      <header className="flex items-center justify-between gap-3 border-b border-neutral-800 bg-neutral-950 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold tracking-[0.24em] text-primary uppercase">
-            Kithan
-          </p>
-          <h1 className="truncate text-lg font-semibold tracking-tight">
-            {showArchived ? 'Archiv' : 'Problemräume'}
-          </h1>
+      <header
+        className={`flex justify-between gap-3 border-b border-neutral-800 bg-neutral-950 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
+          showArchived ? 'items-start' : 'items-center'
+        }`}
+      >
+        <div
+          className={`flex min-w-0 gap-1 ${
+            showArchived ? 'items-start' : 'items-center'
+          }`}
+        >
+          {showArchived ? (
+            <button
+              type="button"
+              onClick={() => setShowArchived(false)}
+              aria-label="Zurück zu Problemräume"
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-primary"
+            >
+              <BackIcon />
+            </button>
+          ) : null}
+          <div className="min-w-0 pt-1">
+            <p className="text-[11px] font-semibold tracking-[0.24em] text-primary uppercase">
+              Kithan
+            </p>
+            <h1
+              className={`font-semibold tracking-tight ${
+                showArchived
+                  ? 'text-base leading-snug'
+                  : 'truncate text-lg'
+              }`}
+            >
+              {showArchived ? 'Abgeschlossene Problemräume' : 'Problemräume'}
+            </h1>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowArchived((current) => !current)}
-            className={`text-sm font-medium transition ${
-              showArchived ? 'text-archive' : 'text-neutral-400 hover:text-white'
-            }`}
-          >
-            Archiv
-          </button>
+          {showArchived ? null : (
+            <button
+              type="button"
+              onClick={() => setShowArchived(true)}
+              className="text-sm font-medium text-neutral-400 transition hover:text-white"
+            >
+              Archiv
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
@@ -175,6 +201,20 @@ function clearTicketHash() {
     null,
     '',
     `${window.location.pathname}${window.location.search}`,
+  )
+}
+
+function BackIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden>
+      <path
+        d="M15 5 8 12l7 7"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 

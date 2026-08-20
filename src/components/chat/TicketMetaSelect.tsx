@@ -73,13 +73,13 @@ export function TicketMetaSelect({
             onClick={onArchive}
             className="h-11 w-1/4 rounded-xl border border-archive/50 bg-archive/10 px-1 text-[11px] font-semibold leading-tight text-archive transition hover:bg-archive/20 disabled:opacity-40"
           >
-            Archivieren
+            Abschließen
           </button>
         </div>
       ) : null}
 
       {onDelete && archived ? (
-        <div className="flex justify-end">
+        <div className="flex justify-end pr-4">
           <button
             type="button"
             disabled={disabled}
