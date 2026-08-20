@@ -84,6 +84,7 @@ create table public.ticket_members (
   ticket_id uuid not null references public.tickets (id) on delete cascade,
   user_id uuid not null references public.users (id) on delete cascade,
   added_at timestamptz not null default now(),
+  last_read_at timestamptz not null default now(),
   constraint ticket_members_unique unique (ticket_id, user_id)
 );
 
@@ -91,6 +92,25 @@ create index ticket_members_ticket_id_idx on public.ticket_members (ticket_id);
 create index ticket_members_user_id_idx on public.ticket_members (user_id);
 
 comment on table public.ticket_members is 'Wer an welchem Problemraum beteiligt ist. Weitere Kollegen werden über + hinzugefügt.';
+comment on column public.ticket_members.last_read_at is 'Nachrichten danach gelten als ungelesen. Wird beim Öffnen des Problemraums aktualisiert.';
+
+-- ---------------------------------------------------------------------------
+-- push_subscriptions — Web-Push für Mitteilungen bei geschlossener App
+-- ---------------------------------------------------------------------------
+
+create table public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users (id) on delete cascade,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now(),
+  constraint push_subscriptions_endpoint_unique unique (endpoint)
+);
+
+create index push_subscriptions_user_id_idx on public.push_subscriptions (user_id);
+
+comment on table public.push_subscriptions is 'Web-Push-Abos der Mitarbeiter-Geräte (PWA).';
 
 -- ---------------------------------------------------------------------------
 -- messages — Chatnachrichten in einem Problemraum
@@ -150,6 +170,7 @@ alter table public.users enable row level security;
 alter table public.tickets enable row level security;
 alter table public.ticket_members enable row level security;
 alter table public.messages enable row level security;
+alter table public.push_subscriptions enable row level security;
 
 create policy users_select_anon
   on public.users for select
@@ -174,11 +195,18 @@ create policy messages_all_anon
   using (true)
   with check (true);
 
+create policy push_subscriptions_all_anon
+  on public.push_subscriptions for all
+  to anon, authenticated
+  using (true)
+  with check (true);
+
 grant usage on schema public to anon, authenticated;
 grant select on table public.users to anon, authenticated;
 grant select, insert, update, delete on table public.tickets to anon, authenticated;
 grant select, insert, update, delete on table public.ticket_members to anon, authenticated;
 grant select, insert, update, delete on table public.messages to anon, authenticated;
+grant select, insert, update, delete on table public.push_subscriptions to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Storage: Fotos und Videos (Beweissicherung)

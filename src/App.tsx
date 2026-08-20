@@ -7,6 +7,8 @@ import {
 import { TicketRoom } from './components/chat/TicketRoom'
 import { TicketList } from './components/dashboard/TicketList'
 import { OfflineBanner } from './components/OfflineBanner'
+import { MessageToast } from './components/ui/MessageToast'
+import { useIncomingAlerts } from './hooks/useIncomingAlerts'
 import { purgeExpiredChatMedia } from './lib/mediaTtl'
 import {
   fetchAccessibleTicket,
@@ -27,6 +29,24 @@ function App() {
     if (!currentUser) return
     void purgeExpiredChatMedia()
   }, [currentUser])
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+
+    function onWorkerMessage(event: MessageEvent) {
+      const url = event.data?.url as string | undefined
+      if (event.data?.type !== 'open-ticket' || !url) return
+      const hashIndex = url.indexOf('#')
+      if (hashIndex >= 0) {
+        window.location.hash = url.slice(hashIndex)
+      }
+    }
+
+    navigator.serviceWorker.addEventListener('message', onWorkerMessage)
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', onWorkerMessage)
+    }
+  }, [])
 
   useEffect(() => {
     if (!currentUser) return
@@ -83,6 +103,12 @@ function App() {
     clearTicketHash()
   }, [])
 
+  const { unreadCounts, toast, openToastTicket } = useIncomingAlerts(
+    currentUser,
+    selectedTicket?.id ?? null,
+    openTicket,
+  )
+
   function logout() {
     clearStoredUser()
     closeTicket()
@@ -102,6 +128,13 @@ function App() {
     return (
       <>
         <OfflineBanner />
+        {toast ? (
+          <MessageToast
+            title={toast.title}
+            body={toast.body}
+            onOpen={() => void openToastTicket()}
+          />
+        ) : null}
         <TicketRoom
           ticket={selectedTicket}
           currentUser={currentUser}
@@ -115,6 +148,13 @@ function App() {
   return (
     <div className="flex min-h-svh flex-col bg-black text-white">
       <OfflineBanner />
+      {toast ? (
+        <MessageToast
+          title={toast.title}
+          body={toast.body}
+          onOpen={() => void openToastTicket()}
+        />
+      ) : null}
       <header
         className={`flex justify-between gap-3 border-b border-neutral-800 bg-neutral-950 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
           showArchived ? 'items-start' : 'items-center'
@@ -187,6 +227,7 @@ function App() {
         currentUser={currentUser}
         showArchived={showArchived}
         createOpen={createOpen}
+        unreadCounts={unreadCounts}
         onCreateOpenChange={setCreateOpen}
         onSelectTicket={openTicket}
         onCreatedActive={() => setShowArchived(false)}

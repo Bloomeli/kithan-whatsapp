@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { prepareChatMedia, uploadChatMedia } from '../../lib/media'
+import { notifyTicketMembers } from '../../lib/push'
 import { supabase } from '../../lib/supabase'
 import { deleteTicketCompletely, fetchAccessibleTicket } from '../../lib/tickets'
 import type {
@@ -226,6 +227,16 @@ export function TicketRoom({
       setMessages((current) => {
         if (current.some((entry) => entry.id === data.id)) return current
         return [...current, data]
+      })
+
+      const preview =
+        text.trim() ||
+        (mediaType === 'video' ? 'Video' : mediaType === 'image' ? 'Foto' : 'Nachricht')
+      void notifyTicketMembers({
+        ticketId: ticket.id,
+        senderId: currentUser.id,
+        title: ticket.title,
+        body: `${currentUser.name}: ${preview}`,
       })
     } catch (sendError) {
       setError(

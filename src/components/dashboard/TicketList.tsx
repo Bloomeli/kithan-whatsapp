@@ -6,6 +6,7 @@ import {
   fetchTicketsForMember,
   needsArchiveDeleteReminder,
 } from '../../lib/tickets'
+import { formatUnreadBadge } from '../../lib/unread'
 import type { Ticket, TicketPriority, User } from '../../types'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { CreateTicketModal } from './CreateTicketModal'
@@ -27,6 +28,7 @@ interface TicketListProps {
   currentUser: User
   showArchived?: boolean
   createOpen?: boolean
+  unreadCounts?: Record<string, number>
   onCreateOpenChange?: (open: boolean) => void
   onSelectTicket?: (ticket: Ticket) => void
   onCreatedActive?: () => void
@@ -36,6 +38,7 @@ export function TicketList({
   currentUser,
   showArchived = false,
   createOpen = false,
+  unreadCounts = {},
   onCreateOpenChange,
   onSelectTicket,
   onCreatedActive,
@@ -134,6 +137,7 @@ export function TicketList({
                 ticket={ticket}
                 selected={ticket.id === selectedId}
                 archived={showArchived}
+                unreadCount={unreadCounts[ticket.id] ?? 0}
                 onSelect={handleSelect}
                 onEdit={setEditing}
                 onDelete={showArchived ? setDeleting : undefined}
@@ -187,6 +191,7 @@ function TicketRow({
   ticket,
   selected,
   archived,
+  unreadCount,
   onSelect,
   onEdit,
   onDelete,
@@ -194,6 +199,7 @@ function TicketRow({
   ticket: Ticket
   selected: boolean
   archived: boolean
+  unreadCount: number
   onSelect: (ticket: Ticket) => void
   onEdit: (ticket: Ticket) => void
   onDelete?: (ticket: Ticket) => void
@@ -268,6 +274,14 @@ function TicketRow({
               </span>
             ) : null}
           </span>
+          {formatUnreadBadge(unreadCount) ? (
+            <span
+              aria-label={`${unreadCount} ungelesene Nachrichten`}
+              className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#FF3B30] px-1.5 text-[11px] font-bold text-white"
+            >
+              {formatUnreadBadge(unreadCount)}
+            </span>
+          ) : null}
           <time
             dateTime={ticket.updated_at}
             className="shrink-0 text-[11px] text-neutral-500"

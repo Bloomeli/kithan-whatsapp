@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       includeAssets: [
         'favicon.svg',
@@ -15,6 +18,9 @@ export default defineConfig({
         'icon-192.png',
         'icon-512.png',
       ],
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
+      },
       manifest: {
         name: 'Kithan Problemräume',
         short_name: 'Kithan',
@@ -46,12 +52,9 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
-        navigateFallback: '/index.html',
-      },
       devOptions: {
         enabled: true,
+        type: 'module',
       },
     }),
   ],

@@ -42,6 +42,7 @@ export type TicketMember = {
   ticket_id: string
   user_id: string
   added_at: string
+  last_read_at?: string
 }
 
 export type Message = {
@@ -104,11 +105,13 @@ export type TicketMemberInsert = {
   ticket_id: string
   user_id: string
   added_at?: string
+  last_read_at?: string
 }
 
 export type TicketMemberUpdate = {
   ticket_id?: string
   user_id?: string
+  last_read_at?: string
 }
 
 export type MessageInsert = {
@@ -125,6 +128,15 @@ export type MessageUpdate = {
   content?: string
   media_url?: string | null
   media_type?: MediaType | null
+}
+
+export type PushSubscriptionRow = {
+  id: string
+  user_id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+  created_at: string
 }
 
 export type Database = {
@@ -185,6 +197,32 @@ export type Database = {
           },
           {
             foreignKeyName: 'messages_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: PushSubscriptionRow
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'push_subscriptions_user_id_fkey'
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'users'
