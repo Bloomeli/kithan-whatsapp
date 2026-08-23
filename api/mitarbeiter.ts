@@ -1,13 +1,24 @@
-const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(
-  /\/$/,
-  '',
-)
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
+const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim()
+const SUPABASE_ANON_KEY = (
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  ''
+).trim()
 
-function supabaseHost() {
+function usersUrl() {
+  const base = new URL(SUPABASE_URL)
+  const prefix = base.pathname.replace(/\/$/, '')
+  const path = prefix.endsWith('/rest/v1') ? `${prefix}/users` : '/rest/v1/users'
+  const url = new URL(path, `${base.origin}/`)
+  url.searchParams.set('select', 'id,name,created_at')
+  url.searchParams.set('order', 'name.asc')
+  return url
+}
+
+function urlHint() {
   try {
-    return new URL(SUPABASE_URL).host
+    const url = usersUrl()
+    return `${url.host}${url.pathname}`
   } catch {
     return 'ungueltige-url'
   }
@@ -33,20 +44,18 @@ export default async function handler(
   }
 
   try {
-    const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/users?select=id,name,created_at&order=name.asc`,
-      {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
+    const response = await fetch(usersUrl(), {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Accept: 'application/json',
       },
-    )
+    })
     const body = await response.text()
     if (!response.ok) {
       res.status(500).json({
         ok: false,
-        error: `${supabaseHost()} · ${body.slice(0, 160) || `HTTP ${response.status}`}`,
+        error: `${urlHint()} · ${body.slice(0, 160) || `HTTP ${response.status}`}`,
       })
       return
     }
@@ -54,7 +63,7 @@ export default async function handler(
   } catch (error) {
     res.status(500).json({
       ok: false,
-      error: `${supabaseHost()} · ${error instanceof Error ? error.message : 'Fetch fehlgeschlagen'}`,
+      error: `${urlHint()} · ${error instanceof Error ? error.message : 'Fetch fehlgeschlagen'}`,
     })
   }
 }
