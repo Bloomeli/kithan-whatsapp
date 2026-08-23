@@ -33,8 +33,7 @@ function hostedFetch(input: RequestInfo | URL, init?: RequestInit) {
     return fetch(input, init)
   }
 
-  const route = suffix.startsWith('/storage/') ? '/api/media' : '/api/sb'
-  const proxied = `${window.location.origin}${route}?u=${encodeURIComponent(suffix)}
+  const proxied = `${window.location.origin}/api/sb?u=${encodeURIComponent(suffix)}`
   if (typeof input === 'string' || input instanceof URL) {
     return fetch(proxied, init)
   }

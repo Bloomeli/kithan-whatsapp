@@ -8,12 +8,18 @@ const FORWARD_HEADERS = [
   'accept-profile',
   'apikey',
   'authorization',
+  'cache-control',
   'content-profile',
   'content-type',
   'prefer',
   'range',
   'x-client-info',
+  'x-upsert',
 ]
+
+export const config = {
+  api: { bodyParser: false },
+}
 
 function readQuery(
   req: { query?: Record<string, string | string[] | undefined>; url?: string },
@@ -27,14 +33,21 @@ function readQuery(
   return ''
 }
 
+async function readRawBody(req: AsyncIterable<Buffer | string>) {
+  const chunks: Buffer[] = []
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  }
+  return Buffer.concat(chunks)
+}
+
 export default async function handler(
   req: {
     method?: string
     url?: string
     headers?: Record<string, string | string[] | undefined>
     query?: Record<string, string | string[] | undefined>
-    body?: unknown
-  },
+  } & AsyncIterable<Buffer | string>,
   res: {
     status: (code: number) => { end: (body?: unknown) => void }
     setHeader: (name: string, value: string) => void
@@ -47,7 +60,11 @@ export default async function handler(
   }
 
   const suffix = readQuery(req)
-  if (!suffix.startsWith('/rest/') && !suffix.startsWith('/auth/')) {
+  if (
+    !suffix.startsWith('/rest/') &&
+    !suffix.startsWith('/auth/') &&
+    !suffix.startsWith('/storage/')
+  ) {
     res.status(404).end('Not found')
     return
   }
@@ -60,8 +77,12 @@ export default async function handler(
 
   const init: RequestInit = { method: req.method || 'GET', headers }
   if (req.method && !['GET', 'HEAD'].includes(req.method)) {
-    if (typeof req.body === 'string') init.body = req.body
-    else if (req.body != null) init.body = JSON.stringify(req.body)
+    const body = await readRawBody(req)
+    if (body.length > 4_200_000) {
+      res.status(413).end('Datei ist zu groß für den Upload.')
+      return
+    }
+    if (body.length > 0) init.body = body
   }
 
   const target = new URL(suffix, `${SUPABASE_URL}/`)
