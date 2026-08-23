@@ -11,6 +11,9 @@ import type { TicketPriority, TicketStatus } from '../../types'
 const FIELD_CLASS =
   'h-11 w-full appearance-none rounded-xl border border-neutral-800 bg-black px-3 text-sm text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
 
+const SITUATION_CLASS =
+  'min-h-[4.25rem] w-full resize-none rounded-xl border border-neutral-800 bg-black px-3 py-2 text-sm text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
+
 const PRIORITY_TEXT: Record<TicketPriority, string> = {
   emergency: 'font-semibold text-emergency',
   urgent: 'font-semibold text-urgent',
@@ -72,11 +75,8 @@ export function TicketMetaSelect({
       <InsuranceFields
         compact
         insuranceDamage={insuranceDamage}
-        situation={situation}
         disabled={disabled}
         onInsuranceChange={onInsuranceChange}
-        onSituationChange={onSituationChange}
-        onSituationBlur={onSituationBlur}
       />
 
       <div className="flex items-end gap-2">
@@ -116,6 +116,19 @@ export function TicketMetaSelect({
           </button>
         ) : null}
       </div>
+
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[11px] font-medium text-neutral-400">Situation</span>
+        <textarea
+          value={situation}
+          disabled={disabled}
+          rows={3}
+          placeholder="Kurz der Stand vor Ort, ohne den Chat zu durchsuchen."
+          onChange={(event) => onSituationChange(event.target.value)}
+          onBlur={onSituationBlur}
+          className={SITUATION_CLASS}
+        />
+      </label>
     </div>
   )
 }

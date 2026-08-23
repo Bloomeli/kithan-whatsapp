@@ -124,7 +124,7 @@ export async function createTicketForUser(input: {
       occurred_at: input.occurredAt,
       reported_by: input.reportedBy.trim() || null,
       insurance_damage: Boolean(input.insuranceDamage),
-      situation: input.insuranceDamage ? input.situation?.trim() || null : null,
+      situation: input.situation?.trim() || null,
       contact: input.contact?.trim() || null,
       remarks: input.remarks?.trim() || null,
     })
@@ -217,7 +217,7 @@ export async function updateTicketDetails(input: {
       occurred_at: input.occurredAt,
       reported_by: input.reportedBy.trim() || null,
       insurance_damage: Boolean(input.insuranceDamage),
-      situation: input.insuranceDamage ? input.situation?.trim() || null : null,
+      situation: input.situation?.trim() || null,
       contact: input.contact?.trim() || null,
       remarks: input.remarks?.trim() || null,
     })

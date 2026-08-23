@@ -138,10 +138,8 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
           <div className="mt-3">
             <InsuranceFields
               insuranceDamage={insuranceDamage}
-              situation={situation}
               disabled={saving}
               onInsuranceChange={setInsuranceDamage}
-              onSituationChange={setSituation}
             />
           </div>
 
@@ -158,6 +156,18 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
               }))}
             />
           </div>
+
+          <label className="mt-3 flex flex-col gap-2">
+            <span className="text-sm font-medium text-neutral-200">Situation</span>
+            <textarea
+              value={situation}
+              disabled={saving}
+              rows={3}
+              placeholder="Kurz der Stand vor Ort"
+              onChange={(event) => setSituation(event.target.value)}
+              className="min-h-[4.5rem] w-full resize-none rounded-xl border border-neutral-800 bg-black px-4 py-2 text-base text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+            />
+          </label>
 
           <div className="mt-3 flex flex-col gap-2">
             <span className="text-sm font-medium text-neutral-200">Gebäude</span>
