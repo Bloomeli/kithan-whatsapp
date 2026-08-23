@@ -36,6 +36,7 @@ export function CreateTicketModal({
   const [unitLocation, setUnitLocation] = useState('')
   const [tenantName, setTenantName] = useState('')
   const [contact, setContact] = useState('')
+  const [remarks, setRemarks] = useState('')
   const [occurredDate, setOccurredDate] = useState('')
   const [occurredTime, setOccurredTime] = useState('')
   const [reportedBy, setReportedBy] = useState('')
@@ -108,6 +109,7 @@ export function CreateTicketModal({
       insuranceDamage,
       situation,
       contact,
+      remarks,
     })
 
     setSaving(false)
@@ -312,14 +314,28 @@ export function CreateTicketModal({
 
               <label className="mt-3 flex flex-col gap-2">
                 <span className="text-sm font-medium text-neutral-200">
-                  Kontakt
+                  Kontakt Telefonnummer / E-Mail
                 </span>
                 <input
                   type="text"
                   value={contact}
                   onChange={(event) => setContact(event.target.value)}
                   disabled={saving}
-                  placeholder="Telefon oder E-Mail"
+                  placeholder="Telefonnummer / E-Mail"
+                  className={FIELD_CLASS}
+                />
+              </label>
+
+              <label className="mt-3 flex flex-col gap-2">
+                <span className="text-sm font-medium text-neutral-200">
+                  Sonstiges
+                </span>
+                <input
+                  type="text"
+                  value={remarks}
+                  onChange={(event) => setRemarks(event.target.value)}
+                  disabled={saving}
+                  placeholder="Freitext"
                   className={FIELD_CLASS}
                 />
               </label>

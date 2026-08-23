@@ -98,6 +98,7 @@ export async function createTicketForUser(input: {
   insuranceDamage?: boolean
   situation?: string
   contact?: string
+  remarks?: string
 }): Promise<{ ticket: Ticket | null; error: string | null }> {
   const trimmed = input.title.trim()
   if (!trimmed) {
@@ -120,6 +121,7 @@ export async function createTicketForUser(input: {
       insurance_damage: Boolean(input.insuranceDamage),
       situation: input.insuranceDamage ? input.situation?.trim() || null : null,
       contact: input.contact?.trim() || null,
+      remarks: input.remarks?.trim() || null,
     })
     .select(TICKET_COLUMNS)
     .single()
@@ -164,6 +166,7 @@ export async function updateTicketDetails(input: {
   insuranceDamage?: boolean
   situation?: string
   contact?: string
+  remarks?: string
 }): Promise<{ ticket: Ticket | null; error: string | null }> {
   const trimmed = input.title.trim()
   if (!trimmed) {
@@ -185,6 +188,7 @@ export async function updateTicketDetails(input: {
       insurance_damage: Boolean(input.insuranceDamage),
       situation: input.insuranceDamage ? input.situation?.trim() || null : null,
       contact: input.contact?.trim() || null,
+      remarks: input.remarks?.trim() || null,
     })
     .eq('id', input.ticketId)
     .select(TICKET_COLUMNS)

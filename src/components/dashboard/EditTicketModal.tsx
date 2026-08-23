@@ -28,6 +28,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
   const [unitLocation, setUnitLocation] = useState(ticket.unit_location ?? '')
   const [tenantName, setTenantName] = useState(ticket.tenant_name ?? '')
   const [contact, setContact] = useState(ticket.contact ?? '')
+  const [remarks, setRemarks] = useState(ticket.remarks ?? '')
   const [occurredDate, setOccurredDate] = useState(isoToDateInput(ticket.occurred_at))
   const [occurredTime, setOccurredTime] = useState(isoToTimeInput(ticket.occurred_at))
   const [reportedBy, setReportedBy] = useState(ticket.reported_by ?? '')
@@ -71,6 +72,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
       insuranceDamage,
       situation,
       contact,
+      remarks,
     })
 
     setSaving(false)
@@ -199,13 +201,27 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
           </label>
 
           <label className="mt-3 flex flex-col gap-2">
-            <span className="text-sm font-medium text-neutral-200">Kontakt</span>
+            <span className="text-sm font-medium text-neutral-200">
+              Kontakt Telefonnummer / E-Mail
+            </span>
             <input
               type="text"
               value={contact}
               onChange={(event) => setContact(event.target.value)}
               disabled={saving}
-              placeholder="Telefon oder E-Mail"
+              placeholder="Telefonnummer / E-Mail"
+              className={FIELD_CLASS}
+            />
+          </label>
+
+          <label className="mt-3 flex flex-col gap-2">
+            <span className="text-sm font-medium text-neutral-200">Sonstiges</span>
+            <input
+              type="text"
+              value={remarks}
+              onChange={(event) => setRemarks(event.target.value)}
+              disabled={saving}
+              placeholder="Freitext"
               className={FIELD_CLASS}
             />
           </label>
