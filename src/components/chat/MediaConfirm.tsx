@@ -85,7 +85,7 @@ export function MediaConfirm({
           disabled={sending}
           className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-white disabled:opacity-40"
         >
-          {sending ? 'Wird in den Chat geladen…' : error ? 'Erneut versuchen' : 'In den Chat'}
+          {sending ? 'Wird in den Chat geladen…' : error ? 'Erneut versuchen' : 'In den Chat hochladen'}
         </button>
         <button
           type="button"
