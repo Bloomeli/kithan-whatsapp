@@ -8,6 +8,7 @@ interface MediaConfirmProps {
   onUse: () => void
   onRetake: () => void
   onDiscard: () => void
+  onBackToChat: () => void
 }
 
 export function MediaConfirm({
@@ -18,6 +19,7 @@ export function MediaConfirm({
   onUse,
   onRetake,
   onDiscard,
+  onBackToChat,
 }: MediaConfirmProps) {
   const [preview, setPreview] = useState('')
   const isVideo = file.type.startsWith('video/')
@@ -84,6 +86,14 @@ export function MediaConfirm({
           className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-white disabled:opacity-40"
         >
           {sending ? 'Wird in den Chat geladen…' : error ? 'Erneut versuchen' : 'In den Chat'}
+        </button>
+        <button
+          type="button"
+          onClick={onBackToChat}
+          disabled={sending}
+          className="mt-2 h-11 w-full text-sm text-primary disabled:opacity-40"
+        >
+          Zum Chat
         </button>
       </div>
     </div>

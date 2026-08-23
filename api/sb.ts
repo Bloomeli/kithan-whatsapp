@@ -85,7 +85,8 @@ export default async function handler(
     if (body.length > 0) init.body = body
   }
 
-  const target = new URL(suffix, `${SUPABASE_URL}/`)
+  const origin = new URL(SUPABASE_URL).origin
+  const target = new URL(suffix.startsWith('/') ? suffix : `/${suffix}`, `${origin}/`)
   const response = await fetch(target, init)
   const buffer = Buffer.from(await response.arrayBuffer())
   res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json')

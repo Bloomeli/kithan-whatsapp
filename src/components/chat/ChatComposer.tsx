@@ -16,6 +16,7 @@ const TIME_LIMIT_WARNING =
 export function ChatComposer({ sending, statusText, error, onSend }: ChatComposerProps) {
   const [text, setText] = useState('')
   const [pending, setPending] = useState<File | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [recorderOpen, setRecorderOpen] = useState(false)
@@ -60,6 +61,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
 
   function clearPending() {
     setPending(null)
+    setPreviewOpen(false)
     setRetakeKind(null)
     if (photoRef.current) photoRef.current.value = ''
     if (videoRef.current) videoRef.current.value = ''
@@ -73,6 +75,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
     setRecorderOpen(false)
     setRetakeKind('photo')
     setPending(next)
+    setPreviewOpen(Boolean(next))
   }
 
   async function handleVideoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -88,6 +91,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
     setLocalError(null)
     setRetakeKind('video')
     setPending(next)
+    setPreviewOpen(true)
 
     const overLimit = await isVideoOverTimeLimit(next)
     setWarning(overLimit ? TIME_LIMIT_WARNING : null)
@@ -100,6 +104,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
     setLocalError(null)
     setRetakeKind('video')
     setPending(next)
+    setPreviewOpen(true)
     setWarning(hitTimeLimit ? TIME_LIMIT_WARNING : null)
   }
 
@@ -120,7 +125,27 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
         onSubmit={handleSubmit}
         className="border-t border-neutral-800 bg-neutral-950 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
       >
-        {localError ? (
+        {pending && !previewOpen ? (
+          <p className="truncate pb-1 text-xs text-neutral-400">
+            Anhang: {pending.name}
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="ml-2 text-primary"
+            >
+              Vorschau
+            </button>
+            <button
+              type="button"
+              onClick={clearPending}
+              className="ml-2 text-primary"
+            >
+              Entfernen
+            </button>
+          </p>
+        ) : null}
+
+        {localError && !previewOpen ? (
           <p className="pb-1 text-xs text-red-300">{localError}</p>
         ) : null}
 
@@ -190,7 +215,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
         </div>
       </form>
 
-      {pending ? (
+      {pending && previewOpen ? (
         <MediaConfirm
           file={pending}
           sending={sending}
@@ -199,6 +224,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
           onUse={() => void sendPending()}
           onRetake={retake}
           onDiscard={clearPending}
+          onBackToChat={() => setPreviewOpen(false)}
         />
       ) : null}
 

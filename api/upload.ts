@@ -1,9 +1,15 @@
+import { createClient } from '@supabase/supabase-js'
+
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(
   /\/$/,
   '',
 )
 const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
+
+function projectOrigin() {
+  return new URL(SUPABASE_URL).origin
+}
 
 export default async function handler(
   req: { method?: string; body?: unknown },
@@ -23,7 +29,7 @@ export default async function handler(
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
   const ticketId = String(body?.ticketId ?? '')
-  const extension = String(body?.extension ?? 'bin').replace(/[^a-z0-9]/gi, '')
+  const extension = String(body?.extension ?? 'bin').replace(/[^a-z0-9]/gi, '') || 'bin'
   const contentType = String(body?.contentType ?? 'application/octet-stream')
   const data = String(body?.data ?? '')
 
@@ -38,29 +44,24 @@ export default async function handler(
     return
   }
 
-  const path = `${ticketId}/${crypto.randomUUID()}.${extension || 'bin'}`
-  const response = await fetch(`${SUPABASE_URL}/storage/v1/object/chat-media/${path}`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': contentType,
-      'x-upsert': 'false',
-    },
-    body: fileBytes,
+  const origin = projectOrigin()
+  const path = `${ticketId}/${crypto.randomUUID()}.${extension}`
+  const supabase = createClient(origin, SUPABASE_ANON_KEY)
+  const { error } = await supabase.storage.from('chat-media').upload(path, fileBytes, {
+    contentType,
+    upsert: false,
   })
 
-  if (!response.ok) {
-    const detail = await response.text()
+  if (error) {
     res.status(500).json({
       ok: false,
-      error: detail.slice(0, 180) || `HTTP ${response.status}`,
+      error: `${origin}/storage/v1 · ${error.message}`,
     })
     return
   }
 
   res.status(200).json({
     ok: true,
-    publicUrl: `${SUPABASE_URL}/storage/v1/object/public/chat-media/${path}`,
+    publicUrl: `${origin}/storage/v1/object/public/chat-media/${path}`,
   })
 }
