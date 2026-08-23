@@ -209,6 +209,7 @@ export function TicketRoom({
 
       const content =
         text.trim() ||
+        mediaOriginLabel(ticket) ||
         (mediaType === 'video' ? 'Video' : mediaType === 'image' ? 'Foto' : '')
 
       const { data, error: insertError } = await supabase
@@ -238,6 +239,7 @@ export function TicketRoom({
 
       const preview =
         text.trim() ||
+        mediaOriginLabel(ticket) ||
         (mediaType === 'video' ? 'Video' : mediaType === 'image' ? 'Foto' : 'Nachricht')
       void notifyTicketMembers({
         ticketId: ticket.id,
@@ -414,6 +416,12 @@ function BackIcon() {
       />
     </svg>
   )
+}
+
+function mediaOriginLabel(ticket: Ticket): string {
+  const street = ticket.building_label?.split(',')[0]?.trim() ?? ''
+  const unit = ticket.unit_location?.trim() ?? ''
+  return [street, unit].filter(Boolean).join(', ')
 }
 
 function TicketIncidentSummary({ ticket }: { ticket: Ticket }) {
