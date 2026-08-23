@@ -4,6 +4,7 @@ import { notifyTicketMembers } from '../../lib/push'
 import { supabase } from '../../lib/supabase'
 import { addInsuranceHandlers } from '../../lib/staff'
 import { deleteTicketCompletely, ensureTicketMembership, fetchAccessibleTicket } from '../../lib/tickets'
+import { markTicketRead } from '../../lib/unread'
 import type {
   Message,
   Ticket,
@@ -141,19 +142,46 @@ export function TicketRoom({
       )
       .subscribe()
 
-    const refreshMembers = window.setInterval(() => {
-      void supabase
-        .from('ticket_members')
-        .select('id, ticket_id, user_id, added_at, last_read_at')
-        .eq('ticket_id', ticket.id)
-        .then(({ data }) => {
-          if (!cancelled && data) setMembers(data)
+    async function pullLatest() {
+      const [messagesResult, membersResult] = await Promise.all([
+        supabase
+          .from('messages')
+          .select(
+            'id, ticket_id, user_id, content, media_url, media_type, created_at',
+          )
+          .eq('ticket_id', ticket.id)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('ticket_members')
+          .select('id, ticket_id, user_id, added_at, last_read_at')
+          .eq('ticket_id', ticket.id),
+      ])
+
+      if (cancelled) return
+      if (messagesResult.data) {
+        setMessages((current) => {
+          const incoming = messagesResult.data ?? []
+          const hasNewFromOthers = incoming.some(
+            (entry) =>
+              entry.user_id !== currentUser.id &&
+              !current.some((known) => known.id === entry.id),
+          )
+          if (hasNewFromOthers) {
+            void markTicketRead(ticket.id, currentUser.id)
+          }
+          return mergeMessages(current, incoming)
         })
-    }, 8000)
+      }
+      if (membersResult.data) setMembers(membersResult.data)
+    }
+
+    const refreshRoom = window.setInterval(() => {
+      void pullLatest()
+    }, 1200)
 
     return () => {
       cancelled = true
-      window.clearInterval(refreshMembers)
+      window.clearInterval(refreshRoom)
       void supabase.removeChannel(channel)
     }
   }, [ticket.id, currentUser.id, onBack])
@@ -524,6 +552,17 @@ function BackIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  )
+}
+
+function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+  if (incoming.length === current.length && incoming.every((row, index) => row.id === current[index]?.id)) {
+    return current
+  }
+  const seen = new Set(incoming.map((row) => row.id))
+  const extras = current.filter((row) => !seen.has(row.id))
+  return [...incoming, ...extras].sort((left, right) =>
+    left.created_at.localeCompare(right.created_at),
   )
 }
 

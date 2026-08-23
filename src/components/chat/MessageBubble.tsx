@@ -157,7 +157,7 @@ function PlayIcon() {
 function ReceiptTicks({ status }: { status: ReceiptStatus }) {
   const label =
     status === 'read' ? 'Gelesen' : status === 'delivered' ? 'Zugestellt' : 'Gesendet'
-  const color = status === 'read' ? 'text-[#7ec8ff]' : 'text-white/55'
+  const color = status === 'read' ? 'text-[#00F0FF] drop-shadow-[0_0_6px_#00F0FF]' : 'text-white/55'
 
   return (
     <span aria-label={label} className={color}>

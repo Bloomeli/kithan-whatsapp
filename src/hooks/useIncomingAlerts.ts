@@ -89,6 +89,7 @@ export function useIncomingAlerts(
     }
 
     void loadMemberIds()
+    const seenIds = { current: null as Set<string> | null }
 
     const channel = supabase
       .channel(`incoming-messages-${userId}`)
@@ -103,6 +104,8 @@ export function useIncomingAlerts(
 
     async function handleIncoming(message: Message) {
       if (message.user_id === userId) return
+      if (seenIds.current?.has(message.id)) return
+      seenIds.current?.add(message.id)
       if (typeof navigator !== 'undefined' && !navigator.onLine) return
 
       if (!memberIdsRef.current.has(message.ticket_id)) {
@@ -148,14 +151,51 @@ export function useIncomingAlerts(
       }
     }
 
+    async function pullInbox() {
+      if (cancelled || document.visibilityState !== 'visible') return
+      if (memberIdsRef.current.size === 0) await loadMemberIds()
+      const ticketIds = [...memberIdsRef.current]
+      if (ticketIds.length === 0) return
+
+      const { data } = await supabase
+        .from('messages')
+        .select('id, ticket_id, user_id, content, media_url, media_type, created_at')
+        .in('ticket_id', ticketIds)
+        .order('created_at', { ascending: false })
+        .limit(40)
+
+      if (!data) return
+      if (!seenIds.current) {
+        seenIds.current = new Set(data.map((row) => row.id))
+        return
+      }
+
+      const fresh = data
+        .filter((row) => !seenIds.current?.has(row.id))
+        .reverse()
+      for (const message of fresh) {
+        seenIds.current.add(message.id)
+        void handleIncoming(message)
+      }
+    }
+
     function onVisible() {
-      if (document.visibilityState === 'visible') void refreshUnread()
+      if (document.visibilityState === 'visible') {
+        void refreshUnread()
+        void pullInbox()
+      }
     }
     document.addEventListener('visibilitychange', onVisible)
+    const unreadPoll = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void refreshUnread()
+      void pullInbox()
+    }, 1500)
 
     return () => {
       cancelled = true
       document.removeEventListener('visibilitychange', onVisible)
+      window.clearInterval(unreadPoll)
       if (toastTimerRef.current !== null) {
         window.clearTimeout(toastTimerRef.current)
       }
