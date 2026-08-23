@@ -34,13 +34,28 @@ export function LoginDropdown({ onSelect }: LoginDropdownProps) {
   const [selectedId, setSelectedId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [errorDetail, setErrorDetail] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
+    async function loadUsersFromApi() {
+      const response = await fetch('/api/users')
+      const payload = (await response.json()) as {
+        ok?: boolean
+        users?: User[]
+        error?: string
+      }
+      if (!response.ok || !payload.ok || !payload.users) {
+        throw new Error(payload.error || `HTTP ${response.status}`)
+      }
+      return payload.users
+    }
+
     async function loadUsers() {
       setLoading(true)
       setError(null)
+      setErrorDetail(null)
 
       const { data, error: queryError } = await supabase
         .from('users')
@@ -49,16 +64,27 @@ export function LoginDropdown({ onSelect }: LoginDropdownProps) {
 
       if (cancelled) return
 
-      if (queryError) {
-        setError(
-          'Mitarbeiter konnten nicht geladen werden. Prüfe die Supabase-Verbindung und ob das Schema ausgeführt wurde.',
-        )
+      if (!queryError) {
+        setUsers(data ?? [])
         setLoading(false)
         return
       }
 
-      setUsers(data ?? [])
-      setLoading(false)
+      try {
+        const fallbackUsers = await loadUsersFromApi()
+        if (cancelled) return
+        setUsers(fallbackUsers)
+        setLoading(false)
+      } catch (fallbackError) {
+        if (cancelled) return
+        setError('Mitarbeiter konnten nicht geladen werden.')
+        setErrorDetail(
+          [queryError.message, fallbackError instanceof Error ? fallbackError.message : '']
+            .filter(Boolean)
+            .join(' · '),
+        )
+        setLoading(false)
+      }
     }
 
     void loadUsers()
@@ -121,6 +147,11 @@ export function LoginDropdown({ onSelect }: LoginDropdownProps) {
         {error ? (
           <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
             {error}
+            {errorDetail ? (
+              <span className="mt-1 block font-mono text-xs text-red-200/80">
+                {errorDetail}
+              </span>
+            ) : null}
           </p>
         ) : null}
 
