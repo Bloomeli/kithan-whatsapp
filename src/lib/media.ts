@@ -4,10 +4,10 @@ import { CHAT_MEDIA_BUCKET, type MediaType } from '../types'
 
 const MAX_IMAGE_EDGE = 1920
 const IMAGE_QUALITY = 0.8
-const MAX_VIDEO_EDGE = 1080
+const MAX_VIDEO_EDGE = 720
 export const MAX_VIDEO_SECONDS = 30
-export const VIDEO_BITRATE = 2_500_000
-const MAX_VIDEO_PASSTHROUGH_BYTES = 12 * 1024 * 1024
+export const VIDEO_BITRATE = 900_000
+const MAX_VIDEO_PASSTHROUGH_BYTES = 3.2 * 1024 * 1024
 const VIDEO_DURATION_EPSILON = 0.05
 
 export async function isVideoOverTimeLimit(file: File): Promise<boolean> {
@@ -40,7 +40,9 @@ export async function uploadChatMedia(ticketId: string, file: File): Promise<str
   })
 
   if (error) {
-    throw new Error('Datei konnte nicht in den Speicher geladen werden.')
+    throw new Error(
+      `Datei konnte nicht in den Speicher geladen werden. ${error.message}`,
+    )
   }
 
   const { data } = supabase.storage.from(CHAT_MEDIA_BUCKET).getPublicUrl(path)

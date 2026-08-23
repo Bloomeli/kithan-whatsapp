@@ -29,11 +29,12 @@ function hostedFetch(input: RequestInfo | URL, init?: RequestInit) {
   if (!href.startsWith(configuredUrl)) return fetch(input, init)
 
   const suffix = href.slice(configuredUrl.length)
-  if (suffix.startsWith('/storage/') || suffix.startsWith('/realtime/')) {
+  if (suffix.startsWith('/realtime/')) {
     return fetch(input, init)
   }
 
-  const proxied = `${window.location.origin}/api/sb?u=${encodeURIComponent(suffix)}`
+  const route = suffix.startsWith('/storage/') ? '/api/media' : '/api/sb'
+  const proxied = `${window.location.origin}${route}?u=${encodeURIComponent(suffix)}
   if (typeof input === 'string' || input instanceof URL) {
     return fetch(proxied, init)
   }
