@@ -3,7 +3,7 @@ import { addInsuranceHandlers, getInsuranceHandlerUsers } from './staff'
 import { CHAT_MEDIA_BUCKET, type Ticket, type TicketPriority, type TicketStatus } from '../types'
 
 const TICKET_COLUMNS =
-  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, archived_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation'
+  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, archived_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation, contact'
 
 export const ARCHIVE_DELETE_AFTER_DAYS = 14
 const ARCHIVE_DELETE_AFTER_MS = ARCHIVE_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000
@@ -97,6 +97,7 @@ export async function createTicketForUser(input: {
   reportedBy: string
   insuranceDamage?: boolean
   situation?: string
+  contact?: string
 }): Promise<{ ticket: Ticket | null; error: string | null }> {
   const trimmed = input.title.trim()
   if (!trimmed) {
@@ -118,6 +119,7 @@ export async function createTicketForUser(input: {
       reported_by: input.reportedBy.trim() || null,
       insurance_damage: Boolean(input.insuranceDamage),
       situation: input.insuranceDamage ? input.situation?.trim() || null : null,
+      contact: input.contact?.trim() || null,
     })
     .select(TICKET_COLUMNS)
     .single()
@@ -161,6 +163,7 @@ export async function updateTicketDetails(input: {
   reportedBy: string
   insuranceDamage?: boolean
   situation?: string
+  contact?: string
 }): Promise<{ ticket: Ticket | null; error: string | null }> {
   const trimmed = input.title.trim()
   if (!trimmed) {
@@ -181,6 +184,7 @@ export async function updateTicketDetails(input: {
       reported_by: input.reportedBy.trim() || null,
       insurance_damage: Boolean(input.insuranceDamage),
       situation: input.insuranceDamage ? input.situation?.trim() || null : null,
+      contact: input.contact?.trim() || null,
     })
     .eq('id', input.ticketId)
     .select(TICKET_COLUMNS)

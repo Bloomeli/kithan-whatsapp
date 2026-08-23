@@ -501,7 +501,8 @@ function TicketIncidentSummary({ ticket }: { ticket: Ticket }) {
   const lines = [
     ticket.building_label,
     ticket.unit_location,
-    ticket.tenant_name ? `Mieter: ${ticket.tenant_name}` : null,
+    ticket.tenant_name ? `Betroffener Mieter: ${ticket.tenant_name}` : null,
+    ticket.contact ? `Kontakt: ${ticket.contact}` : null,
     ticket.occurred_at ? `Wann: ${formatOccurredAt(ticket.occurred_at)}` : null,
     ticket.reported_by ? `Gemeldet von: ${ticket.reported_by}` : null,
   ].filter((line): line is string => Boolean(line))

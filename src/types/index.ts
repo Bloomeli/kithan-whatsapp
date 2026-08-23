@@ -37,6 +37,7 @@ export type Ticket = {
   reported_by: string | null
   insurance_damage: boolean
   situation: string | null
+  contact: string | null
 }
 
 export type TicketMember = {
@@ -86,6 +87,7 @@ export type TicketInsert = {
   reported_by?: string | null
   insurance_damage?: boolean
   situation?: string | null
+  contact?: string | null
 }
 
 export type TicketUpdate = {
@@ -104,6 +106,7 @@ export type TicketUpdate = {
   reported_by?: string | null
   insurance_damage?: boolean
   situation?: string | null
+  contact?: string | null
 }
 
 export type TicketMemberInsert = {

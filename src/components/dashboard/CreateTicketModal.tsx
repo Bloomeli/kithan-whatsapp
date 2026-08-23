@@ -35,6 +35,7 @@ export function CreateTicketModal({
   const [buildingId, setBuildingId] = useState('')
   const [unitLocation, setUnitLocation] = useState('')
   const [tenantName, setTenantName] = useState('')
+  const [contact, setContact] = useState('')
   const [occurredDate, setOccurredDate] = useState('')
   const [occurredTime, setOccurredTime] = useState('')
   const [reportedBy, setReportedBy] = useState('')
@@ -106,6 +107,7 @@ export function CreateTicketModal({
       reportedBy,
       insuranceDamage,
       situation,
+      contact,
     })
 
     setSaving(false)
@@ -136,7 +138,7 @@ export function CreateTicketModal({
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 id="create-ticket-title" className="text-base font-semibold">
-            {step === 1 ? 'Zuständige Personen' : 'Neuer Problemraum'}
+            {step === 1 ? 'Zuständige Personen' : 'Neue Meldung/Problem'}
           </h2>
           <button
             type="button"
@@ -208,7 +210,7 @@ export function CreateTicketModal({
             <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-neutral-200">
-                  Problemraum-Name
+                  Meldung/Problem
                 </span>
                 <input
                   type="text"
@@ -265,7 +267,7 @@ export function CreateTicketModal({
 
               <div className="mt-3 flex flex-col gap-2">
                 <span className="text-sm font-medium text-neutral-200">
-                  Einheit/Wohnung
+                  Gebäude
                 </span>
                 <NeonSelect
                   value={buildingId}
@@ -282,28 +284,56 @@ export function CreateTicketModal({
 
               <label className="mt-3 flex flex-col gap-2">
                 <span className="text-sm font-medium text-neutral-200">
-                  Wohnungsnummer / Lage
+                  Bereich/Stockwerk/Mietfläche
                 </span>
                 <input
                   type="text"
                   value={unitLocation}
                   onChange={(event) => setUnitLocation(event.target.value)}
                   disabled={saving}
-                  placeholder="z.B. WHG 07, EG links, 2. OG rechts"
+                  placeholder="z.B. EG links, 2. OG, Mietfläche 07"
                   className={FIELD_CLASS}
                 />
               </label>
 
               <label className="mt-3 flex flex-col gap-2">
                 <span className="text-sm font-medium text-neutral-200">
-                  Mietername
+                  Betroffener Mieter
                 </span>
                 <input
                   type="text"
                   value={tenantName}
                   onChange={(event) => setTenantName(event.target.value)}
                   disabled={saving}
-                  placeholder="z.B. Max Mustermann"
+                  placeholder="Name"
+                  className={FIELD_CLASS}
+                />
+              </label>
+
+              <label className="mt-3 flex flex-col gap-2">
+                <span className="text-sm font-medium text-neutral-200">
+                  Kontakt
+                </span>
+                <input
+                  type="text"
+                  value={contact}
+                  onChange={(event) => setContact(event.target.value)}
+                  disabled={saving}
+                  placeholder="Telefon oder E-Mail"
+                  className={FIELD_CLASS}
+                />
+              </label>
+
+              <label className="mt-3 flex flex-col gap-2">
+                <span className="text-sm font-medium text-neutral-200">
+                  Wer hat das Problem gemeldet?
+                </span>
+                <input
+                  type="text"
+                  value={reportedBy}
+                  onChange={(event) => setReportedBy(event.target.value)}
+                  disabled={saving}
+                  placeholder="Name"
                   className={FIELD_CLASS}
                 />
               </label>
@@ -336,20 +366,6 @@ export function CreateTicketModal({
                   />
                 </label>
               </div>
-
-              <label className="mt-3 flex flex-col gap-2">
-                <span className="text-sm font-medium text-neutral-200">
-                  Wer hat das Problem gemeldet?
-                </span>
-                <input
-                  type="text"
-                  value={reportedBy}
-                  onChange={(event) => setReportedBy(event.target.value)}
-                  disabled={saving}
-                  placeholder="Name"
-                  className={FIELD_CLASS}
-                />
-              </label>
             </div>
 
             {error ? (

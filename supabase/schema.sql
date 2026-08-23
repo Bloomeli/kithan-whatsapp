@@ -59,6 +59,7 @@ create table public.tickets (
   reported_by text,
   insurance_damage boolean not null default false,
   situation text,
+  contact text,
   constraint tickets_title_not_empty check (char_length(trim(title)) > 0)
 );
 
@@ -72,12 +73,13 @@ comment on column public.tickets.archived is 'true = Archiv (Neongrün-Markierun
 comment on column public.tickets.archived_at is 'Zeitpunkt der Archivierung. Nach 14 Tagen erinnert die UI zum manuellen Löschen.';
 comment on column public.tickets.building_id is 'Objekt-ID aus der Vermietungs-App (Wohnung/Einheit).';
 comment on column public.tickets.building_label is 'Adress-Label zum Zeitpunkt der Erstellung.';
-comment on column public.tickets.unit_location is 'Wohnungsnummer / Lage innerhalb des Gebäudes.';
-comment on column public.tickets.tenant_name is 'Name der/des Mieter(s).';
+comment on column public.tickets.unit_location is 'Bereich, Stockwerk oder Mietfläche innerhalb des Gebäudes.';
+comment on column public.tickets.tenant_name is 'Betroffener Mieter.';
 comment on column public.tickets.occurred_at is 'Datum und Uhrzeit, wann das Problem passiert ist.';
 comment on column public.tickets.reported_by is 'Wer das Problem gemeldet hat.';
 comment on column public.tickets.insurance_damage is 'Versicherungsschaden ja/nein.';
 comment on column public.tickets.situation is 'Kurzbeschreibung, wenn insurance_damage = true.';
+comment on column public.tickets.contact is 'Kontakt zum betroffenen Mieter.';
 
 -- ---------------------------------------------------------------------------
 -- ticket_members — Zuordnung Mitarbeiter ↔ Ticket (n:m)

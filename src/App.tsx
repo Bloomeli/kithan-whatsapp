@@ -203,7 +203,7 @@ function App() {
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            aria-label="Neuen Problemraum erstellen"
+            aria-label="Neue Meldung/Problem erstellen"
             className="flex h-11 w-11 items-center justify-center text-2xl font-light text-primary"
           >
             +

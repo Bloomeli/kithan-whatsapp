@@ -27,6 +27,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
   const [buildingId, setBuildingId] = useState(ticket.building_id ?? '')
   const [unitLocation, setUnitLocation] = useState(ticket.unit_location ?? '')
   const [tenantName, setTenantName] = useState(ticket.tenant_name ?? '')
+  const [contact, setContact] = useState(ticket.contact ?? '')
   const [occurredDate, setOccurredDate] = useState(isoToDateInput(ticket.occurred_at))
   const [occurredTime, setOccurredTime] = useState(isoToTimeInput(ticket.occurred_at))
   const [reportedBy, setReportedBy] = useState(ticket.reported_by ?? '')
@@ -69,6 +70,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
       reportedBy,
       insuranceDamage,
       situation,
+      contact,
     })
 
     setSaving(false)
@@ -91,7 +93,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 id="edit-ticket-title" className="text-base font-semibold">
-            Problemraum korrigieren
+            Meldung/Problem korrigieren
           </h2>
           <button
             type="button"
@@ -104,7 +106,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
           <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-neutral-200">Problemraum-Name</span>
+            <span className="text-sm font-medium text-neutral-200">Meldung/Problem</span>
             <input
               type="text"
               value={title}
@@ -156,7 +158,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
           </div>
 
           <div className="mt-3 flex flex-col gap-2">
-            <span className="text-sm font-medium text-neutral-200">Einheit/Wohnung</span>
+            <span className="text-sm font-medium text-neutral-200">Gebäude</span>
             <NeonSelect
               value={buildingId}
               disabled={saving}
@@ -172,7 +174,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
 
           <label className="mt-3 flex flex-col gap-2">
             <span className="text-sm font-medium text-neutral-200">
-              Wohnungsnummer / Lage
+              Bereich/Stockwerk/Mietfläche
             </span>
             <input
               type="text"
@@ -184,11 +186,38 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
           </label>
 
           <label className="mt-3 flex flex-col gap-2">
-            <span className="text-sm font-medium text-neutral-200">Mietername</span>
+            <span className="text-sm font-medium text-neutral-200">
+              Betroffener Mieter
+            </span>
             <input
               type="text"
               value={tenantName}
               onChange={(event) => setTenantName(event.target.value)}
+              disabled={saving}
+              className={FIELD_CLASS}
+            />
+          </label>
+
+          <label className="mt-3 flex flex-col gap-2">
+            <span className="text-sm font-medium text-neutral-200">Kontakt</span>
+            <input
+              type="text"
+              value={contact}
+              onChange={(event) => setContact(event.target.value)}
+              disabled={saving}
+              placeholder="Telefon oder E-Mail"
+              className={FIELD_CLASS}
+            />
+          </label>
+
+          <label className="mt-3 flex flex-col gap-2">
+            <span className="text-sm font-medium text-neutral-200">
+              Wer hat das Problem gemeldet?
+            </span>
+            <input
+              type="text"
+              value={reportedBy}
+              onChange={(event) => setReportedBy(event.target.value)}
               disabled={saving}
               className={FIELD_CLASS}
             />
@@ -218,19 +247,6 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
               />
             </label>
           </div>
-
-          <label className="mt-3 flex flex-col gap-2">
-            <span className="text-sm font-medium text-neutral-200">
-              Wer hat das Problem gemeldet?
-            </span>
-            <input
-              type="text"
-              value={reportedBy}
-              onChange={(event) => setReportedBy(event.target.value)}
-              disabled={saving}
-              className={FIELD_CLASS}
-            />
-          </label>
         </div>
 
         {error ? (
