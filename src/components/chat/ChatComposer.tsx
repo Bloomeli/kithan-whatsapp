@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { isVideoOverTimeLimit } from '../../lib/media'
+import { MediaConfirm } from './MediaConfirm'
 import { VideoRecorder } from './VideoRecorder'
 
 interface ChatComposerProps {
@@ -13,21 +14,21 @@ const TIME_LIMIT_WARNING =
 
 export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps) {
   const [text, setText] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [pending, setPending] = useState<File | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [recorderOpen, setRecorderOpen] = useState(false)
+  const [retakeKind, setRetakeKind] = useState<'photo' | 'video' | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLInputElement>(null)
 
-  const canSend = !sending && (text.trim().length > 0 || file !== null)
+  const canSend = !sending && text.trim().length > 0 && !pending
 
-  async function send() {
+  async function sendText() {
     if (!canSend) return
     try {
-      await onSend(text, file)
+      await onSend(text, null)
       setText('')
-      clearAttachment()
       setLocalError(null)
       setWarning(null)
     } catch {
@@ -35,13 +36,27 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    void send()
+  async function sendPending() {
+    if (!pending || sending) return
+    try {
+      await onSend(text, pending)
+      setText('')
+      clearPending()
+      setLocalError(null)
+      setWarning(null)
+    } catch {
+      // Vorschau bleibt, Fehlermeldung kommt aus TicketRoom
+    }
   }
 
-  function clearAttachment() {
-    setFile(null)
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void sendText()
+  }
+
+  function clearPending() {
+    setPending(null)
+    setRetakeKind(null)
     if (photoRef.current) photoRef.current.value = ''
     if (videoRef.current) videoRef.current.value = ''
   }
@@ -51,7 +66,9 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
     if (videoRef.current) videoRef.current.value = ''
     setLocalError(null)
     setWarning(null)
-    setFile(next)
+    setRecorderOpen(false)
+    setRetakeKind('photo')
+    setPending(next)
   }
 
   async function handleVideoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -65,46 +82,32 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
 
     if (photoRef.current) photoRef.current.value = ''
     setLocalError(null)
-    setFile(next)
+    setRetakeKind('video')
+    setPending(next)
 
     const overLimit = await isVideoOverTimeLimit(next)
-    if (!overLimit) {
-      setWarning(null)
-      return
-    }
-
-    setWarning(TIME_LIMIT_WARNING)
-
-    try {
-      await onSend(text, next)
-      setText('')
-      clearAttachment()
-    } catch {
-      // Die ersten 30 Sekunden bleiben als Anhang erhalten
-    }
+    setWarning(overLimit ? TIME_LIMIT_WARNING : null)
   }
 
   async function handleRecorded(next: File, hitTimeLimit: boolean) {
     setRecorderOpen(false)
     if (photoRef.current) photoRef.current.value = ''
     if (videoRef.current) videoRef.current.value = ''
-    setFile(next)
     setLocalError(null)
+    setRetakeKind('video')
+    setPending(next)
+    setWarning(hitTimeLimit ? TIME_LIMIT_WARNING : null)
+  }
 
-    if (!hitTimeLimit) {
-      setWarning(null)
+  function retake() {
+    const kind = retakeKind
+    clearPending()
+    setWarning(null)
+    if (kind === 'video') {
+      setRecorderOpen(true)
       return
     }
-
-    setWarning(TIME_LIMIT_WARNING)
-
-    try {
-      await onSend(text, next)
-      setText('')
-      clearAttachment()
-    } catch {
-      // Clip bleibt als Anhang erhalten
-    }
+    window.setTimeout(() => photoRef.current?.click(), 0)
   }
 
   return (
@@ -113,28 +116,15 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
         onSubmit={handleSubmit}
         className="border-t border-neutral-800 bg-neutral-950 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
       >
-        {file ? (
-          <p className="truncate pb-1 text-xs text-neutral-400">
-            Anhang: {file.name}
-            <button
-              type="button"
-              onClick={clearAttachment}
-              className="ml-2 text-primary"
-            >
-              Entfernen
-            </button>
-          </p>
-        ) : null}
-
         {localError ? (
           <p className="pb-1 text-xs text-red-300">{localError}</p>
         ) : null}
 
-        {warning ? (
+        {warning && !pending ? (
           <p className="pb-1 text-xs text-yellow-300">{warning}</p>
         ) : null}
 
-        {statusText ? (
+        {statusText && !pending ? (
           <p className="pb-1 text-xs text-primary">{statusText}</p>
         ) : null}
 
@@ -181,7 +171,7 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
-                void send()
+                void sendText()
               }
             }}
           />
@@ -195,6 +185,17 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
           </button>
         </div>
       </form>
+
+      {pending ? (
+        <MediaConfirm
+          file={pending}
+          sending={sending}
+          statusText={statusText || warning}
+          onUse={() => void sendPending()}
+          onRetake={retake}
+          onDiscard={clearPending}
+        />
+      ) : null}
 
       {recorderOpen ? (
         <VideoRecorder
