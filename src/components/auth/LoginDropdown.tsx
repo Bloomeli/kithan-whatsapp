@@ -40,7 +40,7 @@ export function LoginDropdown({ onSelect }: LoginDropdownProps) {
     let cancelled = false
 
     async function loadUsersFromApi() {
-      const response = await fetch('/api/users')
+      const response = await fetch('/api/mitarbeiter')
       const payload = (await response.json()) as {
         ok?: boolean
         users?: User[]
