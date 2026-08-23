@@ -47,9 +47,11 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
       clearPending()
       setLocalError(null)
       setWarning(null)
-    } catch {
+    } catch (sendError) {
       setLocalError(
-        'Datei konnte nicht hochgeladen werden. Sie bleibt lokal gespeichert. Bitte später erneut versuchen.',
+        sendError instanceof Error
+          ? sendError.message
+          : 'Datei konnte nicht hochgeladen werden. Sie bleibt lokal gespeichert. Bitte später erneut versuchen.',
       )
     }
   }

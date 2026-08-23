@@ -207,12 +207,16 @@ export function TicketRoom({
         mediaType = prepared.mediaType
       }
 
+      const content =
+        text.trim() ||
+        (mediaType === 'video' ? 'Video' : mediaType === 'image' ? 'Foto' : '')
+
       const { data, error: insertError } = await supabase
         .from('messages')
         .insert({
           ticket_id: ticket.id,
           user_id: currentUser.id,
-          content: text.trim(),
+          content,
           media_url: mediaUrl,
           media_type: mediaType,
         })
