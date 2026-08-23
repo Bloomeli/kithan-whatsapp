@@ -2,7 +2,6 @@ import { supabase } from './supabase'
 
 /** Öffentlicher VAPID-Schlüssel (kein Geheimnis). */
 export const VAPID_PUBLIC_KEY =
-  import.meta.env.VITE_VAPID_PUBLIC_KEY ||
   'BEYYSKlDulxCeF-UJgpJlwUwtvOfNkF2yBE4TnYK81whhBpIJDNRMvMj_JU54YjL8YdgL3CWe3uKSNzjm0YNEqs'
 
 function urlBase64ToUint8Array(base64: string) {
@@ -16,10 +15,15 @@ function urlBase64ToUint8Array(base64: string) {
   return output
 }
 
-export async function subscribePushForUser(userId: string): Promise<void> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-  if (typeof Notification === 'undefined') return
-  if (Notification.permission !== 'granted') return
+export async function subscribePushForUser(
+  userId: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return { ok: false, error: 'Dieses Gerät unterstützt keine Mitteilungen.' }
+  }
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+    return { ok: false, error: 'Mitteilungen sind nicht erlaubt.' }
+  }
 
   const registration = await navigator.serviceWorker.ready
   try {
@@ -37,9 +41,11 @@ export async function subscribePushForUser(userId: string): Promise<void> {
   })
 
   const payload = subscription.toJSON()
-  if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) return
+  if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) {
+    return { ok: false, error: 'Das iPhone hat kein Push-Abo erzeugt.' }
+  }
 
-  await supabase.from('push_subscriptions').upsert(
+  const { error } = await supabase.from('push_subscriptions').upsert(
     {
       user_id: userId,
       endpoint: payload.endpoint,
@@ -48,6 +54,17 @@ export async function subscribePushForUser(userId: string): Promise<void> {
     },
     { onConflict: 'endpoint' },
   )
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message.includes('does not exist')
+        ? 'Tabelle push_subscriptions fehlt. SQL in Supabase ausführen.'
+        : `Abo konnte nicht gespeichert werden. ${error.message}`,
+    }
+  }
+
+  return { ok: true, error: null }
 }
 
 export async function notifyTicketMembers(input: {

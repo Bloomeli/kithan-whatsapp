@@ -10,7 +10,7 @@ void self.skipWaiting()
 clientsClaim()
 
 // Cache-Buster: Home-Screen-Icon auf dem iPhone muss diese Version neu laden.
-const CACHE_RELEASE = '2026-08-24-push-closed'
+const CACHE_RELEASE = '2026-08-24-push-always'
 void CACHE_RELEASE
 
 type PushPayload = {
@@ -47,15 +47,6 @@ async function handlePush(event: PushEvent) {
   } catch {
     // Badge ist auf manchen iPhones optional
   }
-
-  const windows = await self.clients.matchAll({
-    type: 'window',
-    includeUncontrolled: true,
-  })
-  const appVisible = windows.some(
-    (client) => 'visibilityState' in client && client.visibilityState === 'visible',
-  )
-  if (appVisible) return
 
   await self.registration.showNotification(data.title || 'Kithan', {
     body: data.body || 'Neue Nachricht',
