@@ -9,10 +9,15 @@ export const ARCHIVE_DELETE_AFTER_DAYS = 14
 const ARCHIVE_DELETE_AFTER_MS = ARCHIVE_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000
 
 export async function ensureTicketMembership(ticketId: string, userId: string) {
-  await supabase.from('ticket_members').upsert(
-    { ticket_id: ticketId, user_id: userId },
+  const { error } = await supabase.from('ticket_members').upsert(
+    {
+      ticket_id: ticketId,
+      user_id: userId,
+      last_read_at: new Date().toISOString(),
+    },
     { onConflict: 'ticket_id,user_id', ignoreDuplicates: true },
   )
+  return !error
 }
 
 export async function fetchTicketsForMember(
@@ -144,19 +149,34 @@ export async function createTicketForUser(input: {
   const handlerIds = input.insuranceDamage
     ? (await getInsuranceHandlerUsers()).map((user) => user.id)
     : []
-  const uniqueMemberIds = [...new Set([input.userId, ...input.memberIds, ...handlerIds])]
-  const { error: memberError } = await supabase.from('ticket_members').insert(
+
+  const { data: knownUsers } = await supabase.from('users').select('id')
+  const knownIds = new Set((knownUsers ?? []).map((user) => user.id))
+  const extraIds =
+    knownIds.size === 0
+      ? []
+      : [...input.memberIds, ...handlerIds].filter(
+          (userId) => userId !== input.userId && knownIds.has(userId),
+        )
+  const uniqueMemberIds = [...new Set([input.userId, ...extraIds])]
+
+  const now = new Date().toISOString()
+  const { error: memberError } = await supabase.from('ticket_members').upsert(
     uniqueMemberIds.map((userId) => ({
       ticket_id: ticket.id,
       user_id: userId,
+      last_read_at: now,
     })),
+    { onConflict: 'ticket_id,user_id', ignoreDuplicates: true },
   )
 
   if (memberError) {
-    await supabase.from('tickets').delete().eq('id', ticket.id)
+    if (await ensureTicketMembership(ticket.id, input.userId)) {
+      return { ticket, error: null }
+    }
     return {
       ticket: null,
-      error: 'Problemraum konnte nicht mit den Mitgliedern verknüpft werden.',
+      error: `Problemraum konnte nicht mit den Mitgliedern verknüpft werden. ${memberError.message}`.trim(),
     }
   }
 
