@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 /** Öffentlicher VAPID-Schlüssel (kein Geheimnis). */
 export const VAPID_PUBLIC_KEY =
   import.meta.env.VITE_VAPID_PUBLIC_KEY ||
-  'BOyUH_7CAkXbczYZzgSOXl3qCy09qGplR6g8W5LgbpbLAcMNV_bNRLphOpXsuSgRYZEyQjpIUoWnF1BxqVbmzRY'
+  'BEYYSKlDulxCeF-UJgpJlwUwtvOfNkF2yBE4TnYK81whhBpIJDNRMvMj_JU54YjL8YdgL3CWe3uKSNzjm0YNEqs'
 
 function urlBase64ToUint8Array(base64: string) {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4)
@@ -22,13 +22,19 @@ export async function subscribePushForUser(userId: string): Promise<void> {
   if (Notification.permission !== 'granted') return
 
   const registration = await navigator.serviceWorker.ready
-  let subscription = await registration.pushManager.getSubscription()
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    })
+  try {
+    await registration.update()
+  } catch {
+    // Alte Home-Screen-App kann das Update überspringen
   }
+  const existing = await registration.pushManager.getSubscription()
+  if (existing) {
+    await existing.unsubscribe()
+  }
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  })
 
   const payload = subscription.toJSON()
   if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) return

@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 const VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
   process.env.VITE_VAPID_PUBLIC_KEY ||
-  'BOyUH_7CAkXbczYZzgSOXl3qCy09qGplR6g8W5LgbpbLAcMNV_bNRLphOpXsuSgRYZEyQjpIUoWnF1BxqVbmzRY'
+  'BEYYSKlDulxCeF-UJgpJlwUwtvOfNkF2yBE4TnYK81whhBpIJDNRMvMj_JU54YjL8YdgL3CWe3uKSNzjm0YNEqs'
 
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || ''
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:kithan-whatsapp@vercel.app'

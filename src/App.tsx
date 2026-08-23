@@ -8,6 +8,7 @@ import {
 import { TicketRoom } from './components/chat/TicketRoom'
 import { TicketList } from './components/dashboard/TicketList'
 import { OfflineBanner } from './components/OfflineBanner'
+import { PushEnableBanner } from './components/PushEnableBanner'
 import { MessageToast } from './components/ui/MessageToast'
 import { useIncomingAlerts } from './hooks/useIncomingAlerts'
 import { purgeExpiredChatMedia } from './lib/mediaTtl'
@@ -234,6 +235,7 @@ function App() {
           Abmelden
         </button>
       </div>
+      <PushEnableBanner currentUser={currentUser} />
 
       <TicketList
         currentUser={currentUser}
