@@ -9,6 +9,10 @@ cleanupOutdatedCaches()
 void self.skipWaiting()
 clientsClaim()
 
+// Cache-Buster: Home-Screen-Icon auf dem iPhone muss diese Version neu laden.
+const CACHE_RELEASE = '2026-08-23-chat-confirm'
+void CACHE_RELEASE
+
 type PushPayload = {
   title?: string
   body?: string
