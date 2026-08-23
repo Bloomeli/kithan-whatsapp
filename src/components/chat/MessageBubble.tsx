@@ -1,14 +1,21 @@
 import { useRef, useState } from 'react'
 import { isChatMediaExpired, MEDIA_TTL_HOURS } from '../../lib/mediaTtl'
+import type { ReceiptStatus } from '../../lib/unread'
 import type { MediaType, Message } from '../../types'
 
 interface MessageBubbleProps {
   message: Message
   authorName: string
   isOwn: boolean
+  receipt?: ReceiptStatus
 }
 
-export function MessageBubble({ message, authorName, isOwn }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  authorName,
+  isOwn,
+  receipt,
+}: MessageBubbleProps) {
   return (
     <article className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -43,14 +50,17 @@ export function MessageBubble({ message, authorName, isOwn }: MessageBubbleProps
             {message.content}
           </p>
         ) : null}
-        <time
-          dateTime={message.created_at}
-          className={`mt-1 block text-right text-[10px] ${
-            isOwn ? 'text-white/70' : 'text-neutral-400'
-          }`}
-        >
-          {formatMessageTime(message.created_at)}
-        </time>
+        <div className="mt-1 flex items-center justify-end gap-1">
+          <time
+            dateTime={message.created_at}
+            className={`text-[10px] ${
+              isOwn ? 'text-white/70' : 'text-neutral-400'
+            }`}
+          >
+            {formatMessageTime(message.created_at)}
+          </time>
+          {isOwn && receipt ? <ReceiptTicks status={receipt} /> : null}
+        </div>
       </div>
     </article>
   )
@@ -140,6 +150,53 @@ function PlayIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-7 w-7 translate-x-0.5" fill="currentColor" aria-hidden>
       <path d="M8 5.5v13l11-6.5z" />
+    </svg>
+  )
+}
+
+function ReceiptTicks({ status }: { status: ReceiptStatus }) {
+  const label =
+    status === 'read' ? 'Gelesen' : status === 'delivered' ? 'Zugestellt' : 'Gesendet'
+  const color = status === 'read' ? 'text-[#7ec8ff]' : 'text-white/55'
+
+  return (
+    <span aria-label={label} className={color}>
+      {status === 'sent' ? <SingleCheckIcon /> : <DoubleCheckIcon />}
+    </span>
+  )
+}
+
+function SingleCheckIcon() {
+  return (
+    <svg viewBox="0 0 16 12" className="h-3 w-4" fill="none" aria-hidden>
+      <path
+        d="M1 6.5 5 10.5 15 1.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function DoubleCheckIcon() {
+  return (
+    <svg viewBox="0 0 20 12" className="h-3 w-5" fill="none" aria-hidden>
+      <path
+        d="M1 6.5 5 10.5 11.5 3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7 8.5 9 10.5 19 1.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }

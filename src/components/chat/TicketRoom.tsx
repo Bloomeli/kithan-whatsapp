@@ -80,7 +80,7 @@ export function TicketRoom({
         supabase.from('users').select('id, name, created_at'),
         supabase
           .from('ticket_members')
-          .select('id, ticket_id, user_id, added_at')
+          .select('id, ticket_id, user_id, added_at, last_read_at')
           .eq('ticket_id', ticket.id),
       ])
 
@@ -116,10 +116,44 @@ export function TicketRoom({
           })
         },
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ticket_members',
+          filter: `ticket_id=eq.${ticket.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const removed = payload.old as TicketMember
+            setMembers((current) =>
+              current.filter((member) => member.id !== removed.id && member.user_id !== removed.user_id),
+            )
+            return
+          }
+          const row = payload.new as TicketMember
+          setMembers((current) => {
+            const without = current.filter((member) => member.user_id !== row.user_id)
+            return [...without, row]
+          })
+        },
+      )
       .subscribe()
+
+    const refreshMembers = window.setInterval(() => {
+      void supabase
+        .from('ticket_members')
+        .select('id, ticket_id, user_id, added_at, last_read_at')
+        .eq('ticket_id', ticket.id)
+        .then(({ data }) => {
+          if (!cancelled && data) setMembers(data)
+        })
+    }, 8000)
 
     return () => {
       cancelled = true
+      window.clearInterval(refreshMembers)
       void supabase.removeChannel(channel)
     }
   }, [ticket.id, currentUser.id, onBack])
@@ -407,6 +441,7 @@ export function TicketRoom({
           messages={messages}
           usersById={usersById}
           currentUserId={currentUser.id}
+          members={members}
         />
       </div>
 
@@ -431,6 +466,7 @@ export function TicketRoom({
                 ticket_id: ticket.id,
                 user_id: user.id,
                 added_at: new Date().toISOString(),
+                last_read_at: new Date().toISOString(),
               },
             ])
             if (!usersById.has(user.id)) {

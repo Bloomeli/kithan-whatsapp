@@ -1,4 +1,23 @@
 import { supabase } from './supabase'
+import type { Message, TicketMember } from '../types'
+
+export type ReceiptStatus = 'sent' | 'delivered' | 'read'
+
+export function messageReceipt(
+  message: Message,
+  currentUserId: string,
+  members: TicketMember[],
+): ReceiptStatus {
+  const others = members.filter((member) => member.user_id !== currentUserId)
+  if (others.length === 0) return 'sent'
+  const someoneRead = others.some(
+    (member) =>
+      Boolean(member.last_read_at) &&
+      (member.last_read_at as string) >= message.created_at,
+  )
+  if (someoneRead) return 'read'
+  return 'delivered'
+}
 
 export function formatUnreadBadge(count: number): string | null {
   if (count <= 0) return null

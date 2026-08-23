@@ -1,17 +1,20 @@
 import { useEffect, useRef } from 'react'
-import type { Message, User } from '../../types'
+import { messageReceipt } from '../../lib/unread'
+import type { Message, TicketMember, User } from '../../types'
 import { MessageBubble } from './MessageBubble'
 
 interface MessageListProps {
   messages: Message[]
   usersById: Map<string, User>
   currentUserId: string
+  members: TicketMember[]
 }
 
 export function MessageList({
   messages,
   usersById,
   currentUserId,
+  members,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null)
 
@@ -35,6 +38,11 @@ export function MessageList({
           message={message}
           isOwn={message.user_id === currentUserId}
           authorName={usersById.get(message.user_id)?.name ?? 'Mitarbeiter'}
+          receipt={
+            message.user_id === currentUserId
+              ? messageReceipt(message, currentUserId, members)
+              : undefined
+          }
         />
       ))}
       <div ref={endRef} />
