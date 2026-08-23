@@ -127,7 +127,18 @@ export async function createTicketForUser(input: {
     .single()
 
   if (ticketError || !ticket) {
-    return { ticket: null, error: 'Problemraum konnte nicht erstellt werden.' }
+    const detail = ticketError?.message ?? ''
+    if (/foreign key|created_by/i.test(detail)) {
+      return {
+        ticket: null,
+        error:
+          'Die Anmeldung ist veraltet. Bitte abmelden und mit dem Vornamen neu anmelden.',
+      }
+    }
+    return {
+      ticket: null,
+      error: `Problemraum konnte nicht erstellt werden. ${detail}`.trim(),
+    }
   }
 
   const handlerIds = input.insuranceDamage

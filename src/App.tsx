@@ -3,6 +3,7 @@ import {
   LoginDropdown,
   clearStoredUser,
   readStoredUser,
+  resolveStoredUser,
 } from './components/auth/LoginDropdown'
 import { TicketRoom } from './components/chat/TicketRoom'
 import { TicketList } from './components/dashboard/TicketList'
@@ -24,6 +25,17 @@ function App() {
   const [showArchived, setShowArchived] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void resolveStoredUser().then((user) => {
+      if (cancelled) return
+      setCurrentUser(user)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!currentUser) return

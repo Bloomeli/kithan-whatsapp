@@ -29,6 +29,36 @@ export function clearStoredUser() {
   localStorage.removeItem(CURRENT_USER_STORAGE_KEY)
 }
 
+export async function resolveStoredUser(): Promise<User | null> {
+  const stored = readStoredUser()
+  if (!stored) return null
+
+  const { data } = await supabase
+    .from('users')
+    .select('id, name, created_at')
+    .eq('id', stored.id)
+    .maybeSingle()
+
+  if (data) {
+    persistUser(data)
+    return data
+  }
+
+  const { data: byName } = await supabase
+    .from('users')
+    .select('id, name, created_at')
+    .ilike('name', stored.name.trim())
+    .maybeSingle()
+
+  if (byName) {
+    persistUser(byName)
+    return byName
+  }
+
+  clearStoredUser()
+  return null
+}
+
 export function LoginDropdown({ onSelect }: LoginDropdownProps) {
   const [users, setUsers] = useState<User[]>([])
   const [selectedId, setSelectedId] = useState('')
