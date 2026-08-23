@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { prepareChatMedia, uploadChatMedia } from '../../lib/media'
 import { notifyTicketMembers } from '../../lib/push'
 import { supabase } from '../../lib/supabase'
-import { deleteTicketCompletely, fetchAccessibleTicket } from '../../lib/tickets'
+import { deleteTicketCompletely, ensureTicketMembership, fetchAccessibleTicket } from '../../lib/tickets'
 import type {
   Message,
   Ticket,
@@ -54,6 +54,7 @@ export function TicketRoom({
     let cancelled = false
 
     async function loadRoom() {
+      await ensureTicketMembership(ticket.id, currentUser.id)
       const accessible = await fetchAccessibleTicket(ticket.id, currentUser.id)
       if (cancelled) return
 
@@ -338,6 +339,7 @@ export function TicketRoom({
         <AddMembersModal
           ticketId={ticket.id}
           memberIds={members.map((member) => member.user_id)}
+          currentUserId={currentUser.id}
           onClose={() => setAddOpen(false)}
           onAdded={(user) => {
             setMembers((current) => [

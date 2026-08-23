@@ -7,25 +7,40 @@ const TICKET_COLUMNS =
 export const ARCHIVE_DELETE_AFTER_DAYS = 14
 const ARCHIVE_DELETE_AFTER_MS = ARCHIVE_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000
 
+export async function ensureTicketMembership(ticketId: string, userId: string) {
+  await supabase.from('ticket_members').upsert(
+    { ticket_id: ticketId, user_id: userId },
+    { onConflict: 'ticket_id,user_id', ignoreDuplicates: true },
+  )
+}
+
 export async function fetchTicketsForMember(
   userId: string,
   archived = false,
 ): Promise<{ tickets: Ticket[]; error: string | null }> {
-  const { data: memberships, error: memberError } = await supabase
-    .from('ticket_members')
-    .select('ticket_id')
-    .eq('user_id', userId)
+  const [{ data: memberships, error: memberError }, { data: created, error: createdError }] =
+    await Promise.all([
+      supabase.from('ticket_members').select('ticket_id').eq('user_id', userId),
+      supabase.from('tickets').select('id').eq('created_by', userId),
+    ])
 
-  if (memberError) {
+  if (memberError || createdError) {
     return { tickets: [], error: 'Problemräume konnten nicht geladen werden.' }
   }
 
   const ticketIds = [
-    ...new Set((memberships ?? []).map((row) => row.ticket_id)),
+    ...new Set([
+      ...(memberships ?? []).map((row) => row.ticket_id),
+      ...(created ?? []).map((row) => row.id),
+    ]),
   ]
 
   if (ticketIds.length === 0) {
     return { tickets: [], error: null }
+  }
+
+  for (const ticketId of created ?? []) {
+    void ensureTicketMembership(ticketId.id, userId)
   }
 
   const { data, error } = await supabase
@@ -46,15 +61,6 @@ export async function fetchAccessibleTicket(
   ticketId: string,
   userId: string,
 ): Promise<Ticket | null> {
-  const { data: membership, error: memberError } = await supabase
-    .from('ticket_members')
-    .select('id')
-    .eq('ticket_id', ticketId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (memberError || !membership) return null
-
   const { data, error } = await supabase
     .from('tickets')
     .select(TICKET_COLUMNS)
@@ -62,6 +68,17 @@ export async function fetchAccessibleTicket(
     .maybeSingle()
 
   if (error || !data) return null
+
+  const { data: membership } = await supabase
+    .from('ticket_members')
+    .select('id')
+    .eq('ticket_id', ticketId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (!membership && data.created_by !== userId) return null
+
+  await ensureTicketMembership(ticketId, userId)
   return data
 }
 

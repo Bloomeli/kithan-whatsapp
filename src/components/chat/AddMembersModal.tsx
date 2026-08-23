@@ -5,6 +5,7 @@ import type { User } from '../../types'
 interface AddMembersModalProps {
   ticketId: string
   memberIds: string[]
+  currentUserId: string
   onClose: () => void
   onAdded: (user: User) => void
 }
@@ -12,6 +13,7 @@ interface AddMembersModalProps {
 export function AddMembersModal({
   ticketId,
   memberIds,
+  currentUserId,
   onClose,
   onAdded,
 }: AddMembersModalProps) {
@@ -36,7 +38,7 @@ export function AddMembersModal({
         setLoading(false)
         return
       }
-      setUsers(data ?? [])
+      setUsers((data ?? []).filter((user) => user.id !== currentUserId))
       setLoading(false)
     }
 
@@ -44,7 +46,7 @@ export function AddMembersModal({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentUserId])
 
   async function addMember(user: User) {
     if (memberSet.has(user.id) || savingId) return
