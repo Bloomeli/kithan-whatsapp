@@ -10,4 +10,36 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+const configuredUrl = supabaseUrl.replace(/\/$/, '')
+
+function shouldProxy() {
+  return (
+    typeof window !== 'undefined' &&
+    window.location.protocol === 'https:' &&
+    !window.location.hostname.endsWith('supabase.co')
+  )
+}
+
+function hostedFetch(input: RequestInfo | URL, init?: RequestInit) {
+  if (!shouldProxy()) return fetch(input, init)
+
+  const href =
+    typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+
+  if (!href.startsWith(configuredUrl)) return fetch(input, init)
+
+  const suffix = href.slice(configuredUrl.length)
+  if (suffix.startsWith('/storage/') || suffix.startsWith('/realtime/')) {
+    return fetch(input, init)
+  }
+
+  const proxied = `${window.location.origin}/api/sb${suffix}`
+  if (typeof input === 'string' || input instanceof URL) {
+    return fetch(proxied, init)
+  }
+  return fetch(new Request(proxied, input), init)
+}
+
+export const supabase = createClient<Database>(configuredUrl, supabaseAnonKey, {
+  global: { fetch: hostedFetch },
+})
