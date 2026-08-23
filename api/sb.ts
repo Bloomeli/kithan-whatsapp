@@ -15,11 +15,16 @@ const FORWARD_HEADERS = [
   'x-client-info',
 ]
 
-function pathFrom(req: { query?: { path?: string | string[] }; url?: string }) {
-  const raw = req.query?.path
-  const parts = Array.isArray(raw) ? raw : raw ? [raw] : []
-  const search = req.url && req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
-  return { path: parts.join('/'), search }
+function readQuery(
+  req: { query?: Record<string, string | string[] | undefined>; url?: string },
+) {
+  const fromQuery = req.query?.u
+  if (typeof fromQuery === 'string' && fromQuery) return fromQuery
+  if (req.url && req.url.includes('?')) {
+    const search = new URL(req.url, 'https://n.local').searchParams.get('u')
+    if (search) return search
+  }
+  return ''
 }
 
 export default async function handler(
@@ -27,7 +32,7 @@ export default async function handler(
     method?: string
     url?: string
     headers?: Record<string, string | string[] | undefined>
-    query?: { path?: string | string[] }
+    query?: Record<string, string | string[] | undefined>
     body?: unknown
   },
   res: {
@@ -41,8 +46,8 @@ export default async function handler(
     return
   }
 
-  const { path, search } = pathFrom(req)
-  if (!path.startsWith('rest/') && !path.startsWith('auth/')) {
+  const suffix = readQuery(req)
+  if (!suffix.startsWith('/rest/') && !suffix.startsWith('/auth/')) {
     res.status(404).end('Not found')
     return
   }
@@ -59,9 +64,7 @@ export default async function handler(
     else if (req.body != null) init.body = JSON.stringify(req.body)
   }
 
-  const target = new URL(`${SUPABASE_URL}/${path}`)
-  if (search) target.search = search.startsWith('?') ? search : `?${search}`
-
+  const target = new URL(suffix, `${SUPABASE_URL}/`)
   const response = await fetch(target, init)
   const buffer = Buffer.from(await response.arrayBuffer())
   res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json')
