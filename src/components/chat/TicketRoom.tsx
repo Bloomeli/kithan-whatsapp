@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { prepareChatMedia, uploadChatMedia } from '../../lib/media'
 import { notifyTicketMembers } from '../../lib/push'
 import { supabase } from '../../lib/supabase'
+import { addInsuranceHandlers } from '../../lib/staff'
 import { deleteTicketCompletely, ensureTicketMembership, fetchAccessibleTicket } from '../../lib/tickets'
 import type {
   Message,
@@ -44,11 +45,16 @@ export function TicketRoom({
   const [actionBusy, setActionBusy] = useState(false)
   const longPressRef = useRef(false)
   const titleTimerRef = useRef<number | null>(null)
+  const [situationDraft, setSituationDraft] = useState(ticket.situation ?? '')
 
   const usersById = useMemo(
     () => new Map(users.map((user) => [user.id, user])),
     [users],
   )
+
+  useEffect(() => {
+    setSituationDraft(ticket.situation ?? '')
+  }, [ticket.id, ticket.situation])
 
   useEffect(() => {
     let cancelled = false
@@ -146,6 +152,67 @@ export function TicketRoom({
 
     if (updateError || !data) {
       setError('Dringlichkeit konnte nicht gespeichert werden.')
+      return
+    }
+
+    onTicketUpdated(data)
+  }
+
+  async function handleInsuranceChange(next: boolean) {
+    const situation = next ? situationDraft.trim() || null : ticket.situation
+    const { data, error: updateError } = await supabase
+      .from('tickets')
+      .update({
+        insurance_damage: next,
+        situation,
+      })
+      .eq('id', ticket.id)
+      .select()
+      .single()
+
+    if (updateError || !data) {
+      setError('Versicherungsschaden konnte nicht gespeichert werden.')
+      return
+    }
+
+    if (next) {
+      const handlers = await addInsuranceHandlers(ticket.id)
+      setUsers((current) => {
+        const known = new Set(current.map((user) => user.id))
+        return [...current, ...handlers.filter((user) => !known.has(user.id))]
+      })
+      setMembers((current) => {
+        const known = new Set(current.map((member) => member.user_id))
+        return [
+          ...current,
+          ...handlers
+            .filter((user) => !known.has(user.id))
+            .map((user) => ({
+              id: crypto.randomUUID(),
+              ticket_id: ticket.id,
+              user_id: user.id,
+              added_at: new Date().toISOString(),
+            })),
+        ]
+      })
+    }
+
+    onTicketUpdated(data)
+  }
+
+  async function handleSituationSave() {
+    const situation = situationDraft.trim() || null
+    if ((ticket.situation ?? null) === situation) return
+
+    const { data, error: updateError } = await supabase
+      .from('tickets')
+      .update({ situation })
+      .eq('id', ticket.id)
+      .select()
+      .single()
+
+    if (updateError || !data) {
+      setError('Situation konnte nicht gespeichert werden.')
       return
     }
 
@@ -262,74 +329,80 @@ export function TicketRoom({
 
   return (
     <div className="flex h-svh flex-col bg-black text-white">
-      <header className="border-b border-neutral-800 bg-neutral-950 px-2 pb-3 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Zurück zur Liste"
-            className="flex h-11 w-11 shrink-0 items-center justify-center text-primary"
-          >
-            <BackIcon />
-          </button>
-          <h1
-            className="min-w-0 flex-1 truncate text-base font-semibold select-none"
-            onPointerDown={() => {
-              longPressRef.current = false
-              if (titleTimerRef.current !== null) {
-                window.clearTimeout(titleTimerRef.current)
-              }
-              titleTimerRef.current = window.setTimeout(() => {
-                longPressRef.current = true
-                setEditOpen(true)
-              }, 550)
-            }}
-            onPointerUp={() => {
-              if (titleTimerRef.current !== null) {
-                window.clearTimeout(titleTimerRef.current)
-                titleTimerRef.current = null
-              }
-            }}
-            onPointerCancel={() => {
-              if (titleTimerRef.current !== null) {
-                window.clearTimeout(titleTimerRef.current)
-                titleTimerRef.current = null
-              }
-            }}
-            onContextMenu={(event) => event.preventDefault()}
-          >
-            {ticket.title}
-          </h1>
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            aria-label="Mitarbeiter hinzufügen"
-            className="flex h-11 w-11 shrink-0 items-center justify-center text-2xl font-light text-primary"
-          >
-            +
-          </button>
-        </div>
-        <div className="px-2 pt-1">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <header className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950 px-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Zurück zur Liste"
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-primary"
+            >
+              <BackIcon />
+            </button>
+            <h1
+              className="min-w-0 flex-1 truncate text-base font-semibold select-none"
+              onPointerDown={() => {
+                longPressRef.current = false
+                if (titleTimerRef.current !== null) {
+                  window.clearTimeout(titleTimerRef.current)
+                }
+                titleTimerRef.current = window.setTimeout(() => {
+                  longPressRef.current = true
+                  setEditOpen(true)
+                }, 550)
+              }}
+              onPointerUp={() => {
+                if (titleTimerRef.current !== null) {
+                  window.clearTimeout(titleTimerRef.current)
+                  titleTimerRef.current = null
+                }
+              }}
+              onPointerCancel={() => {
+                if (titleTimerRef.current !== null) {
+                  window.clearTimeout(titleTimerRef.current)
+                  titleTimerRef.current = null
+                }
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              {ticket.title}
+            </h1>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              aria-label="Mitarbeiter hinzufügen"
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-2xl font-light text-primary"
+            >
+              +
+            </button>
+          </div>
+        </header>
+
+        <div className="px-3 pb-2 pt-1.5">
           <TicketMetaSelect
             status={currentStatus}
             priority={ticket.priority}
+            insuranceDamage={Boolean(ticket.insurance_damage)}
+            situation={situationDraft}
             archived={ticket.archived}
             onStatusChange={(next) => void handleStatusChange(next)}
             onPriorityChange={(next) => void handlePriorityChange(next)}
+            onInsuranceChange={(next) => void handleInsuranceChange(next)}
+            onSituationChange={setSituationDraft}
+            onSituationBlur={() => void handleSituationSave()}
             onArchive={() => setConfirmArchive(true)}
             onDelete={ticket.archived ? () => setConfirmDelete(true) : undefined}
           />
           <TicketIncidentSummary ticket={ticket} />
         </div>
-      </header>
 
-      {error ? (
-        <p className="mx-3 mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p className="mx-3 mb-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {error}
+          </p>
+        ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
         <MessageList
           messages={messages}
           usersById={usersById}
@@ -337,7 +410,7 @@ export function TicketRoom({
         />
       </div>
 
-        <ChatComposer
+      <ChatComposer
         sending={sending}
         statusText={statusText}
         error={error}
@@ -436,7 +509,7 @@ function TicketIncidentSummary({ ticket }: { ticket: Ticket }) {
   if (lines.length === 0) return null
 
   return (
-    <div className="mt-2 space-y-0.5 text-[12px] leading-snug text-neutral-400">
+    <div className="mt-1.5 space-y-0 text-[11px] leading-snug text-neutral-400">
       {lines.map((line) => (
         <p key={line} className="truncate">
           {line}

@@ -10,6 +10,7 @@ import { getObjektLabel, OBJEKTE } from '../../lib/objekte'
 import { supabase } from '../../lib/supabase'
 import { createTicketForUser } from '../../lib/tickets'
 import type { Ticket, TicketPriority, TicketStatus, User } from '../../types'
+import { InsuranceFields } from '../tickets/InsuranceFields'
 
 interface CreateTicketModalProps {
   currentUser: User
@@ -37,6 +38,8 @@ export function CreateTicketModal({
   const [occurredDate, setOccurredDate] = useState('')
   const [occurredTime, setOccurredTime] = useState('')
   const [reportedBy, setReportedBy] = useState('')
+  const [insuranceDamage, setInsuranceDamage] = useState(false)
+  const [situation, setSituation] = useState('')
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -101,6 +104,8 @@ export function CreateTicketModal({
       tenantName,
       occurredAt: occurredAt.toISOString(),
       reportedBy,
+      insuranceDamage,
+      situation,
     })
 
     setSaving(false)
@@ -118,7 +123,8 @@ export function CreateTicketModal({
     Boolean(priority) &&
     Boolean(buildingId) &&
     Boolean(occurredDate) &&
-    Boolean(occurredTime)
+    Boolean(occurredTime) &&
+    (!insuranceDamage || Boolean(situation.trim()))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
@@ -230,6 +236,16 @@ export function CreateTicketModal({
                     value: entry,
                     label: PRIORITY_LABELS[entry],
                   }))}
+                />
+              </div>
+
+              <div className="mt-3">
+                <InsuranceFields
+                  insuranceDamage={insuranceDamage}
+                  situation={situation}
+                  disabled={saving}
+                  onInsuranceChange={setInsuranceDamage}
+                  onSituationChange={setSituation}
                 />
               </div>
 

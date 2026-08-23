@@ -12,6 +12,7 @@ interface NeonSelectProps {
   disabled?: boolean
   placeholder?: string
   fieldClass: string
+  selectedClass?: string
 }
 
 export function NeonSelect({
@@ -21,6 +22,7 @@ export function NeonSelect({
   disabled = false,
   placeholder = 'Bitte wählen',
   fieldClass,
+  selectedClass,
 }: NeonSelectProps) {
   const [open, setOpen] = useState(false)
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
@@ -72,7 +74,11 @@ export function NeonSelect({
         onClick={() => setOpen((current) => !current)}
         className={`${fieldClass} flex items-center text-left`}
       >
-        <span className={`min-w-0 truncate ${selected ? 'text-white' : 'text-neutral-500'}`}>
+        <span
+          className={`min-w-0 truncate ${
+            selected ? (selectedClass ?? 'text-white') : 'text-neutral-500'
+          }`}
+        >
           {selected?.label ?? placeholder}
         </span>
       </button>

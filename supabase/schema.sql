@@ -57,6 +57,8 @@ create table public.tickets (
   tenant_name text,
   occurred_at timestamptz,
   reported_by text,
+  insurance_damage boolean not null default false,
+  situation text,
   constraint tickets_title_not_empty check (char_length(trim(title)) > 0)
 );
 
@@ -74,6 +76,8 @@ comment on column public.tickets.unit_location is 'Wohnungsnummer / Lage innerha
 comment on column public.tickets.tenant_name is 'Name der/des Mieter(s).';
 comment on column public.tickets.occurred_at is 'Datum und Uhrzeit, wann das Problem passiert ist.';
 comment on column public.tickets.reported_by is 'Wer das Problem gemeldet hat.';
+comment on column public.tickets.insurance_damage is 'Versicherungsschaden ja/nein.';
+comment on column public.tickets.situation is 'Kurzbeschreibung, wenn insurance_damage = true.';
 
 -- ---------------------------------------------------------------------------
 -- ticket_members — Zuordnung Mitarbeiter ↔ Ticket (n:m)
@@ -263,11 +267,16 @@ grant execute on function public.purge_expired_chat_media() to anon, authenticat
 -- ---------------------------------------------------------------------------
 
 insert into public.users (name) values
-  ('Anna Berger'),
-  ('Jonas Keller'),
-  ('Lea Hofmann'),
-  ('Marco Steiner'),
-  ('Nina Vogt'),
-  ('Paul Richter'),
-  ('Sara König'),
-  ('Tim Bauer');
+  ('Arsim'),
+  ('Besatim'),
+  ('Blerim'),
+  ('Fatmir'),
+  ('Halim'),
+  ('Jonas'),
+  ('Lubig'),
+  ('Nives'),
+  ('Philip'),
+  ('Sascha'),
+  ('Nextel'),
+  ('Rita'),
+  ('Bercem');

@@ -13,7 +13,7 @@ import { CreateTicketModal } from './CreateTicketModal'
 import { EditTicketModal } from './EditTicketModal'
 
 const PRIORITY_DOT: Record<TicketPriority, string> = {
-  emergency: 'bg-emergency shadow-[0_0_12px_#ff1a1a]',
+  emergency: 'bg-emergency shadow-[0_0_12px_#c4002e]',
   urgent: 'bg-urgent shadow-[0_0_12px_#ff5f1f]',
   standard: 'bg-standard shadow-[0_0_12px_#ffe500]',
 }

@@ -35,6 +35,8 @@ export type Ticket = {
   tenant_name: string | null
   occurred_at: string | null
   reported_by: string | null
+  insurance_damage: boolean
+  situation: string | null
 }
 
 export type TicketMember = {
@@ -82,6 +84,8 @@ export type TicketInsert = {
   tenant_name?: string | null
   occurred_at?: string | null
   reported_by?: string | null
+  insurance_damage?: boolean
+  situation?: string | null
 }
 
 export type TicketUpdate = {
@@ -98,6 +102,8 @@ export type TicketUpdate = {
   tenant_name?: string | null
   occurred_at?: string | null
   reported_by?: string | null
+  insurance_damage?: boolean
+  situation?: string | null
 }
 
 export type TicketMemberInsert = {
@@ -253,7 +259,7 @@ export type Database = {
 export const CURRENT_USER_STORAGE_KEY = 'kithan.currentUser'
 
 export const PRIORITY_COLORS: Record<TicketPriority, string> = {
-  emergency: '#FF1A1A',
+  emergency: '#C4002E',
   urgent: '#FF5F1F',
   standard: '#FFE500',
 }

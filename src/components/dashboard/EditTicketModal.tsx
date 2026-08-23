@@ -9,6 +9,7 @@ import {
 import { getObjektLabel, OBJEKTE } from '../../lib/objekte'
 import { isoToDateInput, isoToTimeInput, updateTicketDetails } from '../../lib/tickets'
 import type { Ticket, TicketPriority, TicketStatus } from '../../types'
+import { InsuranceFields } from '../tickets/InsuranceFields'
 
 interface EditTicketModalProps {
   ticket: Ticket
@@ -29,6 +30,8 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
   const [occurredDate, setOccurredDate] = useState(isoToDateInput(ticket.occurred_at))
   const [occurredTime, setOccurredTime] = useState(isoToTimeInput(ticket.occurred_at))
   const [reportedBy, setReportedBy] = useState(ticket.reported_by ?? '')
+  const [insuranceDamage, setInsuranceDamage] = useState(Boolean(ticket.insurance_damage))
+  const [situation, setSituation] = useState(ticket.situation ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,7 +40,8 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
     Boolean(priority) &&
     Boolean(buildingId) &&
     Boolean(occurredDate) &&
-    Boolean(occurredTime)
+    Boolean(occurredTime) &&
+    (!insuranceDamage || Boolean(situation.trim()))
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -63,6 +67,8 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
       tenantName,
       occurredAt: occurredAt.toISOString(),
       reportedBy,
+      insuranceDamage,
+      situation,
     })
 
     setSaving(false)
@@ -122,6 +128,16 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
                 value: entry,
                 label: PRIORITY_LABELS[entry],
               }))}
+            />
+          </div>
+
+          <div className="mt-3">
+            <InsuranceFields
+              insuranceDamage={insuranceDamage}
+              situation={situation}
+              disabled={saving}
+              onInsuranceChange={setInsuranceDamage}
+              onSituationChange={setSituation}
             />
           </div>
 

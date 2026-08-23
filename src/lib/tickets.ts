@@ -1,8 +1,9 @@
 import { supabase } from './supabase'
+import { addInsuranceHandlers, getInsuranceHandlerUsers } from './staff'
 import { CHAT_MEDIA_BUCKET, type Ticket, type TicketPriority, type TicketStatus } from '../types'
 
 const TICKET_COLUMNS =
-  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, archived_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by'
+  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, archived_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation'
 
 export const ARCHIVE_DELETE_AFTER_DAYS = 14
 const ARCHIVE_DELETE_AFTER_MS = ARCHIVE_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000
@@ -94,6 +95,8 @@ export async function createTicketForUser(input: {
   tenantName: string
   occurredAt: string
   reportedBy: string
+  insuranceDamage?: boolean
+  situation?: string
 }): Promise<{ ticket: Ticket | null; error: string | null }> {
   const trimmed = input.title.trim()
   if (!trimmed) {
@@ -113,6 +116,8 @@ export async function createTicketForUser(input: {
       tenant_name: input.tenantName.trim() || null,
       occurred_at: input.occurredAt,
       reported_by: input.reportedBy.trim() || null,
+      insurance_damage: Boolean(input.insuranceDamage),
+      situation: input.insuranceDamage ? input.situation?.trim() || null : null,
     })
     .select(TICKET_COLUMNS)
     .single()
@@ -121,7 +126,10 @@ export async function createTicketForUser(input: {
     return { ticket: null, error: 'Problemraum konnte nicht erstellt werden.' }
   }
 
-  const uniqueMemberIds = [...new Set([input.userId, ...input.memberIds])]
+  const handlerIds = input.insuranceDamage
+    ? (await getInsuranceHandlerUsers()).map((user) => user.id)
+    : []
+  const uniqueMemberIds = [...new Set([input.userId, ...input.memberIds, ...handlerIds])]
   const { error: memberError } = await supabase.from('ticket_members').insert(
     uniqueMemberIds.map((userId) => ({
       ticket_id: ticket.id,
@@ -151,6 +159,8 @@ export async function updateTicketDetails(input: {
   tenantName: string
   occurredAt: string
   reportedBy: string
+  insuranceDamage?: boolean
+  situation?: string
 }): Promise<{ ticket: Ticket | null; error: string | null }> {
   const trimmed = input.title.trim()
   if (!trimmed) {
@@ -169,6 +179,8 @@ export async function updateTicketDetails(input: {
       tenant_name: input.tenantName.trim() || null,
       occurred_at: input.occurredAt,
       reported_by: input.reportedBy.trim() || null,
+      insurance_damage: Boolean(input.insuranceDamage),
+      situation: input.insuranceDamage ? input.situation?.trim() || null : null,
     })
     .eq('id', input.ticketId)
     .select(TICKET_COLUMNS)
@@ -176,6 +188,10 @@ export async function updateTicketDetails(input: {
 
   if (error || !ticket) {
     return { ticket: null, error: 'Änderungen konnten nicht gespeichert werden.' }
+  }
+
+  if (input.insuranceDamage) {
+    await addInsuranceHandlers(input.ticketId)
   }
 
   return { ticket, error: null }

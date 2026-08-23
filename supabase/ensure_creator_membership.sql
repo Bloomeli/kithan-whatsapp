@@ -8,11 +8,11 @@ where not exists (
   where m.ticket_id = t.id and m.user_id = t.created_by
 );
 
--- Nextelin Sol in alle bestehenden Problemräume (zum Testen).
+-- Nextel in alle bestehenden Problemräume (zum Testen).
 insert into public.ticket_members (ticket_id, user_id)
 select t.id, u.id
 from public.tickets t
-join public.users u on lower(trim(u.name)) = 'nextelin sol'
+join public.users u on lower(trim(u.name)) = 'nextel'
 where not exists (
   select 1
   from public.ticket_members m
