@@ -222,7 +222,9 @@ export function TicketRoom({
         .single()
 
       if (insertError || !data) {
-        throw new Error('Nachricht konnte nicht gesendet werden.')
+        throw new Error(
+          `Nachricht konnte nicht gesendet werden. ${insertError?.message ?? ''}`.trim(),
+        )
       }
 
       setMessages((current) => {
@@ -329,9 +331,10 @@ export function TicketRoom({
         />
       </div>
 
-      <ChatComposer
+        <ChatComposer
         sending={sending}
         statusText={statusText}
+        error={error}
         onSend={handleSend}
       />
 

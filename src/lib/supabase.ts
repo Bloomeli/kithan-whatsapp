@@ -29,7 +29,7 @@ function hostedFetch(input: RequestInfo | URL, init?: RequestInit) {
   if (!href.startsWith(configuredUrl)) return fetch(input, init)
 
   const suffix = href.slice(configuredUrl.length)
-  if (suffix.startsWith('/realtime/')) {
+  if (suffix.startsWith('/realtime/') || suffix.startsWith('/storage/')) {
     return fetch(input, init)
   }
 

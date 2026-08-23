@@ -4,6 +4,7 @@ interface MediaConfirmProps {
   file: File
   sending: boolean
   statusText: string | null
+  error: string | null
   onUse: () => void
   onRetake: () => void
   onDiscard: () => void
@@ -13,6 +14,7 @@ export function MediaConfirm({
   file,
   sending,
   statusText,
+  error,
   onUse,
   onRetake,
   onDiscard,
@@ -28,21 +30,21 @@ export function MediaConfirm({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
-      <div className="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
+      <div className="grid grid-cols-3 items-center px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
         <button
           type="button"
           onClick={onDiscard}
           disabled={sending}
-          className="text-sm text-neutral-300 disabled:opacity-40"
+          className="justify-self-start text-sm text-primary disabled:opacity-40"
         >
           Verwerfen
         </button>
-        <p className="text-sm font-medium">Vorschau</p>
+        <p className="text-center text-sm font-medium text-white">Vorschau</p>
         <button
           type="button"
           onClick={onRetake}
           disabled={sending}
-          className="text-sm text-primary disabled:opacity-40"
+          className="justify-self-end text-sm text-primary disabled:opacity-40"
         >
           Neu aufnehmen
         </button>
@@ -66,7 +68,11 @@ export function MediaConfirm({
         ) : null}
       </div>
 
-      {statusText ? (
+      {error ? (
+        <p className="px-4 pt-3 text-center text-sm text-red-300">{error}</p>
+      ) : null}
+
+      {statusText && !error ? (
         <p className="px-4 pt-3 text-center text-sm text-primary">{statusText}</p>
       ) : null}
 
@@ -77,7 +83,7 @@ export function MediaConfirm({
           disabled={sending}
           className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-white disabled:opacity-40"
         >
-          {sending ? 'Wird in den Chat geladen…' : 'In den Chat'}
+          {sending ? 'Wird in den Chat geladen…' : error ? 'Erneut versuchen' : 'In den Chat'}
         </button>
       </div>
     </div>

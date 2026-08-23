@@ -6,13 +6,14 @@ import { VideoRecorder } from './VideoRecorder'
 interface ChatComposerProps {
   sending: boolean
   statusText: string | null
+  error: string | null
   onSend: (text: string, file: File | null) => Promise<void>
 }
 
 const TIME_LIMIT_WARNING =
   'Zeitlimit erreicht. Falls nötig, bitte ein weiteres Video erneut aufnehmen.'
 
-export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps) {
+export function ChatComposer({ sending, statusText, error, onSend }: ChatComposerProps) {
   const [text, setText] = useState('')
   const [pending, setPending] = useState<File | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -38,6 +39,7 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
 
   async function sendPending() {
     if (!pending || sending) return
+    setLocalError(null)
     try {
       await onSend(text, pending)
       setText('')
@@ -45,7 +47,9 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
       setLocalError(null)
       setWarning(null)
     } catch {
-      // Vorschau bleibt, Fehlermeldung kommt aus TicketRoom
+      setLocalError(
+        'Datei konnte nicht hochgeladen werden. Sie bleibt lokal gespeichert. Bitte später erneut versuchen.',
+      )
     }
   }
 
@@ -191,6 +195,7 @@ export function ChatComposer({ sending, statusText, onSend }: ChatComposerProps)
           file={pending}
           sending={sending}
           statusText={statusText || warning}
+          error={localError || error}
           onUse={() => void sendPending()}
           onRetake={retake}
           onDiscard={clearPending}

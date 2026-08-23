@@ -34,6 +34,10 @@ export async function uploadChatMedia(ticketId: string, file: File): Promise<str
   const extension = extensionFromFile(file)
   const path = `${ticketId}/${crypto.randomUUID()}.${extension}`
 
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return uploadViaVercel(ticketId, file, extension)
+  }
+
   const { error } = await supabase.storage.from(CHAT_MEDIA_BUCKET).upload(path, file, {
     contentType: file.type || undefined,
     upsert: false,
@@ -49,13 +53,49 @@ export async function uploadChatMedia(ticketId: string, file: File): Promise<str
   return data.publicUrl
 }
 
+async function uploadViaVercel(ticketId: string, file: File, extension: string) {
+  const data = await fileToBase64(file)
+  const response = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ticketId,
+      extension,
+      contentType: file.type || 'application/octet-stream',
+      data,
+    }),
+  })
+  const payload = (await response.json()) as { ok?: boolean; publicUrl?: string; error?: string }
+  if (!response.ok || !payload.ok || !payload.publicUrl) {
+    throw new Error(
+      payload.error
+        ? `Datei konnte nicht hochgeladen werden. ${payload.error}`
+        : 'Datei konnte nicht hochgeladen werden. Sie bleibt lokal gespeichert. Bitte später erneut versuchen.',
+    )
+  }
+  return payload.publicUrl
+}
+
+function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result ?? '')
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    }
+    reader.onerror = () => reject(new Error('Datei konnte lokal nicht gelesen werden.'))
+    reader.readAsDataURL(file)
+  })
+}
+
 async function compressImage(file: File): Promise<File> {
   const fileType = canvasSupportsWebp() ? 'image/webp' : 'image/jpeg'
 
   const compressed = await imageCompression(file, {
     maxWidthOrHeight: MAX_IMAGE_EDGE,
     initialQuality: IMAGE_QUALITY,
-    maxSizeMB: 1.6,
+    maxSizeMB: 1.2,
     fileType,
     useWebWorker: true,
   })
