@@ -214,6 +214,33 @@ grant select, insert, update, delete on table public.ticket_members to anon, aut
 grant select, insert, update, delete on table public.messages to anon, authenticated;
 grant select, insert, update, delete on table public.push_subscriptions to anon, authenticated;
 
+-- Realtime postgres_changes (Free Plan). Ohne Publication kommen keine Events.
+alter table public.messages replica identity full;
+alter table public.ticket_members replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'ticket_members'
+  ) then
+    alter publication supabase_realtime add table public.ticket_members;
+  end if;
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- Storage: Fotos und Videos (Beweissicherung)
 -- ---------------------------------------------------------------------------

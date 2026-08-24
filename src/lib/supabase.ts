@@ -42,4 +42,7 @@ function hostedFetch(input: RequestInfo | URL, init?: RequestInit) {
 
 export const supabase = createClient<Database>(configuredUrl, supabaseAnonKey, {
   global: { fetch: hostedFetch },
+  realtime: {
+    params: { eventsPerSecond: 10 },
+  },
 })

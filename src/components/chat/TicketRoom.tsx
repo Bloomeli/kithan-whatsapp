@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { prepareChatMedia, uploadChatMedia } from '../../lib/media'
 import { notifyTicketMembers } from '../../lib/push'
+import { bindRealtimeCatchUp } from '../../lib/realtime'
 import { supabase } from '../../lib/supabase'
 import { addInsuranceHandlers } from '../../lib/staff'
 import { deleteTicketCompletely, ensureTicketMembership, fetchAccessibleTicket } from '../../lib/tickets'
@@ -99,6 +100,40 @@ export function TicketRoom({
 
     void loadRoom()
 
+    async function catchUp() {
+      if (cancelled) return
+      const [messagesResult, membersResult] = await Promise.all([
+        supabase
+          .from('messages')
+          .select(
+            'id, ticket_id, user_id, content, media_url, media_type, created_at',
+          )
+          .eq('ticket_id', ticket.id)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('ticket_members')
+          .select('id, ticket_id, user_id, added_at, last_read_at')
+          .eq('ticket_id', ticket.id),
+      ])
+
+      if (cancelled) return
+      if (messagesResult.data) {
+        setMessages((current) => {
+          const incoming = messagesResult.data ?? []
+          const hasNewFromOthers = incoming.some(
+            (entry) =>
+              entry.user_id !== currentUser.id &&
+              !current.some((known) => known.id === entry.id),
+          )
+          if (hasNewFromOthers) {
+            void markTicketRead(ticket.id, currentUser.id)
+          }
+          return mergeMessages(current, incoming)
+        })
+      }
+      if (membersResult.data) setMembers(membersResult.data)
+    }
+
     const channel = supabase
       .channel(`ticket-messages-${ticket.id}`)
       .on(
@@ -140,48 +175,14 @@ export function TicketRoom({
           })
         },
       )
-      .subscribe()
 
-    async function pullLatest() {
-      const [messagesResult, membersResult] = await Promise.all([
-        supabase
-          .from('messages')
-          .select(
-            'id, ticket_id, user_id, content, media_url, media_type, created_at',
-          )
-          .eq('ticket_id', ticket.id)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('ticket_members')
-          .select('id, ticket_id, user_id, added_at, last_read_at')
-          .eq('ticket_id', ticket.id),
-      ])
-
-      if (cancelled) return
-      if (messagesResult.data) {
-        setMessages((current) => {
-          const incoming = messagesResult.data ?? []
-          const hasNewFromOthers = incoming.some(
-            (entry) =>
-              entry.user_id !== currentUser.id &&
-              !current.some((known) => known.id === entry.id),
-          )
-          if (hasNewFromOthers) {
-            void markTicketRead(ticket.id, currentUser.id)
-          }
-          return mergeMessages(current, incoming)
-        })
-      }
-      if (membersResult.data) setMembers(membersResult.data)
-    }
-
-    const refreshRoom = window.setInterval(() => {
-      void pullLatest()
-    }, 1200)
+    const unbindCatchUp = bindRealtimeCatchUp(channel, () => {
+      void catchUp()
+    })
 
     return () => {
       cancelled = true
-      window.clearInterval(refreshRoom)
+      unbindCatchUp()
       void supabase.removeChannel(channel)
     }
   }, [ticket.id, currentUser.id, onBack])
