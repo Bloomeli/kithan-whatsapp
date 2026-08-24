@@ -1,4 +1,4 @@
-import webpush from 'web-push'
+import { webcrypto } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 export const VAPID_PUBLIC_KEY =
@@ -23,43 +23,79 @@ export function supabaseAdmin() {
   return createClient(new URL(SUPABASE_URL).origin, SUPABASE_ANON_KEY)
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, message: string) {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), ms)
-    promise.then(
-      (value) => {
-        clearTimeout(timer)
-        resolve(value)
-      },
-      (error) => {
-        clearTimeout(timer)
-        reject(error)
-      },
-    )
+function decodeB64Url(value: string) {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4)
+  return Buffer.from(padded, 'base64')
+}
+
+function encodeB64Url(data: Buffer | Uint8Array | string) {
+  const buf = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data)
+  return buf.toString('base64url')
+}
+
+async function vapidAuthorization(endpoint: string) {
+  const publicRaw = decodeB64Url(VAPID_PUBLIC_KEY)
+  const privateRaw = decodeB64Url(VAPID_PRIVATE_KEY)
+  if (publicRaw.length !== 65 || publicRaw[0] !== 0x04 || privateRaw.length !== 32) {
+    throw new Error('VAPID_PRIVATE_KEY auf Vercel ist ungültig.')
+  }
+
+  const key = await webcrypto.subtle.importKey(
+    'jwk',
+    {
+      kty: 'EC',
+      crv: 'P-256',
+      x: encodeB64Url(publicRaw.subarray(1, 33)),
+      y: encodeB64Url(publicRaw.subarray(33, 65)),
+      d: encodeB64Url(privateRaw),
+    },
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign'],
+  )
+
+  const header = encodeB64Url(JSON.stringify({ typ: 'JWT', alg: 'ES256' }))
+  const payload = encodeB64Url(
+    JSON.stringify({
+      aud: new URL(endpoint).origin,
+      exp: Math.floor(Date.now() / 1000) + 12 * 3600,
+      sub: VAPID_SUBJECT,
+    }),
+  )
+  const unsigned = `${header}.${payload}`
+  const signature = Buffer.from(
+    await webcrypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, Buffer.from(unsigned)),
+  )
+  return `vapid t=${unsigned}.${encodeB64Url(signature)}, k=${VAPID_PUBLIC_KEY}`
+}
+
+async function sendApplePush(endpoint: string) {
+  const authorization = await vapidAuthorization(endpoint)
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: authorization,
+      TTL: '120',
+      Urgency: 'high',
+    },
   })
+  if (!response.ok && response.status !== 201) {
+    const text = await response.text()
+    const error = new Error(`Apple-Push ${response.status}: ${text.slice(0, 160)}`)
+    Object.assign(error, { statusCode: response.status })
+    throw error
+  }
 }
 
 export async function sendPushToUsers(
   userIds: string[],
-  payload: { title: string; body: string; tag?: string; url?: string; unread?: number },
+  _payload: { title: string; body: string; tag?: string; url?: string; unread?: number },
 ): Promise<{ sent: number; error: string | null }> {
   if (!pushConfigured()) {
     return { sent: 0, error: 'Push ist nicht konfiguriert (VAPID_PRIVATE_KEY).' }
   }
   if (userIds.length === 0) {
     return { sent: 0, error: null }
-  }
-
-  try {
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
-  } catch (error) {
-    return {
-      sent: 0,
-      error:
-        error instanceof Error && /pattern/i.test(error.message)
-          ? 'VAPID_PRIVATE_KEY auf Vercel ist ungültig. Schlüssel ohne Anführungszeichen neu setzen.'
-          : `VAPID-Schlüssel ungültig. ${error instanceof Error ? error.message : ''}`.trim(),
-    }
   }
 
   let supabase
@@ -71,6 +107,7 @@ export async function sendPushToUsers(
       error: `Supabase-URL ungültig. ${error instanceof Error ? error.message : ''}`.trim(),
     }
   }
+
   const { data: subscriptions, error: subError } = await supabase
     .from('push_subscriptions')
     .select('id, endpoint, p256dh, auth')
@@ -89,30 +126,11 @@ export async function sendPushToUsers(
     return { sent: 0, error: 'Kein Gerät angemeldet. Mitteilungen auf dem iPhone einschalten.' }
   }
 
-  const body = JSON.stringify({
-    title: payload.title,
-    body: payload.body,
-    tag: payload.tag || 'kithan-message',
-    url: payload.url || '/',
-    unread: payload.unread ?? 1,
-  })
-
   let sent = 0
   let lastError = ''
   for (const row of subscriptions) {
     try {
-      await withTimeout(
-        webpush.sendNotification(
-          {
-            endpoint: row.endpoint,
-            keys: { p256dh: row.p256dh, auth: row.auth },
-          },
-          body,
-          { TTL: 120, urgency: 'high' },
-        ),
-        8000,
-        'Zeitüberschreitung beim Apple-Push.',
-      )
+      await sendApplePush(row.endpoint)
       sent += 1
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'Senden fehlgeschlagen'
