@@ -51,41 +51,52 @@ export function PushEnableBanner({ currentUser }: { currentUser: User }) {
   async function enable() {
     setBusy(true)
     setHint(null)
-    const granted = await requestNotifyPermission()
-    setPermission(notificationState())
-    if (!granted) {
-      setHint('Bitte im Dialog auf Erlauben tippen.')
+    try {
+      const granted = await requestNotifyPermission()
+      setPermission(notificationState())
+      if (!granted) {
+        setHint('Bitte im Dialog auf Erlauben tippen.')
+        return
+      }
+      const result = await subscribePushForUser(currentUser.id)
+      setHint(result.error)
+      await loadStatus()
+    } finally {
       setBusy(false)
-      return
     }
-    const result = await subscribePushForUser(currentUser.id)
-    setHint(result.error)
-    await loadStatus()
-    setBusy(false)
   }
 
   async function testRing() {
     setBusy(true)
     setHint(null)
-    const subscribed = await subscribePushForUser(currentUser.id)
-    if (!subscribed.ok) {
-      setHint(subscribed.error)
+    try {
+      const subscribed = await subscribePushForUser(currentUser.id)
+      if (!subscribed.ok) {
+        setHint(subscribed.error)
+        return
+      }
+      const response = await fetch('/api/notify-self', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.id }),
+        signal: AbortSignal.timeout(12000),
+      })
+      const payload = (await response.json()) as { ok?: boolean; error?: string }
+      setHint(
+        payload.ok
+          ? 'Test gesendet. App offen lassen — Ton oder Mitteilung sollte jetzt kommen. Erst danach die App zumachen und Sascha schreiben lassen.'
+          : payload.error || 'Test fehlgeschlagen.',
+      )
+      await loadStatus()
+    } catch (error) {
+      setHint(
+        error instanceof Error
+          ? `Test abgebrochen: ${error.message}`
+          : 'Test hat zu lange gedauert. App offen lassen und nochmal tippen.',
+      )
+    } finally {
       setBusy(false)
-      return
     }
-    const response = await fetch('/api/notify-self', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUser.id }),
-    })
-    const payload = (await response.json()) as { ok?: boolean; error?: string }
-    setHint(
-      payload.ok
-        ? 'Test gesendet. Es sollte jetzt klingeln oder oben eine Mitteilung stehen.'
-        : payload.error || 'Test fehlgeschlagen.',
-    )
-    await loadStatus()
-    setBusy(false)
   }
 
   const ready = permission === 'granted' && status?.table === 'ok' && status.saved > 0 && status.hasPrivateKey
@@ -134,7 +145,7 @@ export function PushEnableBanner({ currentUser }: { currentUser: User }) {
           onClick={() => void testRing()}
           className="mt-1 font-medium text-primary"
         >
-          {busy ? 'Test läuft…' : ready ? 'Test-Klingel senden' : 'Mitteilungen speichern und testen'}
+          {busy ? 'Test läuft… App offen lassen' : ready ? 'Test-Klingel senden' : 'Mitteilungen speichern und testen'}
         </button>
       )}
 

@@ -21,6 +21,22 @@ export function supabaseAdmin() {
   return createClient(new URL(SUPABASE_URL).origin, SUPABASE_ANON_KEY)
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}
+
 export async function sendPushToUsers(
   userIds: string[],
   payload: { title: string; body: string; tag?: string; url?: string; unread?: number },
@@ -64,12 +80,17 @@ export async function sendPushToUsers(
   let lastError = ''
   for (const row of subscriptions) {
     try {
-      await webpush.sendNotification(
-        {
-          endpoint: row.endpoint,
-          keys: { p256dh: row.p256dh, auth: row.auth },
-        },
-        body,
+      await withTimeout(
+        webpush.sendNotification(
+          {
+            endpoint: row.endpoint,
+            keys: { p256dh: row.p256dh, auth: row.auth },
+          },
+          body,
+          { TTL: 120, urgency: 'high' },
+        ),
+        8000,
+        'Zeitüberschreitung beim Apple-Push.',
       )
       sent += 1
     } catch (error) {

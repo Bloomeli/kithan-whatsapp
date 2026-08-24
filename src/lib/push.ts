@@ -32,13 +32,12 @@ export async function subscribePushForUser(
     // Alte Home-Screen-App kann das Update überspringen
   }
   const existing = await registration.pushManager.getSubscription()
-  if (existing) {
-    await existing.unsubscribe()
-  }
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-  })
+  const subscription =
+    existing ??
+    (await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    }))
 
   const payload = subscription.toJSON()
   if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) {
