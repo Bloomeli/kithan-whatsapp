@@ -1,4 +1,4 @@
-import { pushConfigured, supabaseAdmin } from './push-shared'
+import { pushConfigured, supabaseAdmin, VAPID_PRIVATE_KEY } from './push-shared'
 
 export default async function handler(
   req: { method?: string; query?: { userId?: string } },
@@ -32,7 +32,7 @@ export default async function handler(
 
   res.status(200).json({
     ok: true,
-    hasPrivateKey: Boolean(process.env.VAPID_PRIVATE_KEY),
+    hasPrivateKey: Boolean(VAPID_PRIVATE_KEY),
     table,
     tableError,
     saved,

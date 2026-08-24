@@ -10,7 +10,7 @@ void self.skipWaiting()
 clientsClaim()
 
 // Cache-Buster: Home-Screen-Icon auf dem iPhone muss diese Version neu laden.
-const CACHE_RELEASE = '2026-08-24-push-json'
+const CACHE_RELEASE = '2026-08-24-push-ab'
 void CACHE_RELEASE
 
 type PushPayload = {

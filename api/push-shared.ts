@@ -4,7 +4,9 @@ import { createClient } from '@supabase/supabase-js'
 export const VAPID_PUBLIC_KEY =
   'BEYYSKlDulxCeF-UJgpJlwUwtvOfNkF2yBE4TnYK81whhBpIJDNRMvMj_JU54YjL8YdgL3CWe3uKSNzjm0YNEqs'
 
-export const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || ''
+export const VAPID_PRIVATE_KEY = (process.env.VAPID_PRIVATE_KEY || '')
+  .trim()
+  .replace(/^["']|["']$/g, '')
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:kithan-whatsapp@vercel.app'
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(
   /\/$/,
@@ -48,8 +50,27 @@ export async function sendPushToUsers(
     return { sent: 0, error: null }
   }
 
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
-  const supabase = supabaseAdmin()
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+  } catch (error) {
+    return {
+      sent: 0,
+      error:
+        error instanceof Error && /pattern/i.test(error.message)
+          ? 'VAPID_PRIVATE_KEY auf Vercel ist ungültig. Schlüssel ohne Anführungszeichen neu setzen.'
+          : `VAPID-Schlüssel ungültig. ${error instanceof Error ? error.message : ''}`.trim(),
+    }
+  }
+
+  let supabase
+  try {
+    supabase = supabaseAdmin()
+  } catch (error) {
+    return {
+      sent: 0,
+      error: `Supabase-URL ungültig. ${error instanceof Error ? error.message : ''}`.trim(),
+    }
+  }
   const { data: subscriptions, error: subError } = await supabase
     .from('push_subscriptions')
     .select('id, endpoint, p256dh, auth')

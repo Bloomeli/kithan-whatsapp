@@ -6,6 +6,22 @@ export default async function handler(
     status: (code: number) => { json: (body: unknown) => void }
   },
 ) {
+  try {
+    await handleNotify(req, res)
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Push ist fehlgeschlagen.',
+    })
+  }
+}
+
+async function handleNotify(
+  req: { method?: string; body?: unknown },
+  res: {
+    status: (code: number) => { json: (body: unknown) => void }
+  },
+) {
   if (req.method !== 'POST') {
     res.status(405).json({ ok: false, error: 'Method not allowed' })
     return

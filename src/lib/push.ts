@@ -37,11 +37,16 @@ export async function subscribePushForUser(
 
   try {
     const existing = await registration.pushManager.getSubscription()
+    const vapidBytes = urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    const vapidKey = vapidBytes.buffer.slice(
+      vapidBytes.byteOffset,
+      vapidBytes.byteOffset + vapidBytes.byteLength,
+    ) as ArrayBuffer
     const subscription =
       existing ??
       (await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: vapidKey,
       }))
 
     const payload = subscription.toJSON()
