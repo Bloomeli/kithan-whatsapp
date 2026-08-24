@@ -3,6 +3,12 @@ import { subscribePushForUser } from '../lib/push'
 import { requestNotifyPermission } from '../lib/unread'
 import type { User } from '../types'
 
+type PushStatus = {
+  hasPrivateKey: boolean
+  table: 'ok' | 'missing' | 'error'
+  saved: number
+}
+
 function isStandalonePwa() {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
@@ -17,21 +23,31 @@ function notificationState(): NotificationPermission | 'unsupported' {
   return Notification.permission
 }
 
+function germanError(error: unknown) {
+  const text = error instanceof Error ? error.message : ''
+  if (/pattern/i.test(text)) {
+    return 'iPhone-Antwort war ungültig. App vom Home-Bildschirm öffnen und den Test bei geöffneter App wiederholen.'
+  }
+  return text || 'Test fehlgeschlagen.'
+}
+
 async function readJson(response: Response) {
   const text = await response.text()
   try {
-    return JSON.parse(text) as { ok?: boolean; error?: string; hasPrivateKey?: boolean; table?: string; saved?: number }
+    return JSON.parse(text) as {
+      ok?: boolean
+      error?: string
+      hasPrivateKey?: boolean
+      table?: PushStatus['table']
+      saved?: number
+    }
   } catch {
     throw new Error(
       text.trim().startsWith('<')
-        ? `Server ${response.status}: keine JSON-Antwort. Push-Funktion auf Vercel prüfen.`
+        ? `Server ${response.status}: keine JSON-Antwort.`
         : `Server ${response.status}: ${text.slice(0, 120) || 'leere Antwort'}`,
     )
   }
-}
-  hasPrivateKey: boolean
-  table: 'ok' | 'missing' | 'error'
-  saved: number
 }
 
 export function PushEnableBanner({ currentUser }: { currentUser: User }) {
@@ -51,9 +67,13 @@ export function PushEnableBanner({ currentUser }: { currentUser: User }) {
 
   async function loadStatus() {
     try {
-      const response = await fetch(`/api/push-status?userId=${currentUser.id}`)
+      const response = await fetch(`/api/push-status?userId=${encodeURIComponent(currentUser.id)}`)
       const payload = await readJson(response)
-      setStatus(payload)
+      setStatus({
+        hasPrivateKey: Boolean(payload.hasPrivateKey),
+        table: payload.table === 'missing' || payload.table === 'error' ? payload.table : 'ok',
+        saved: payload.saved ?? 0,
+      })
     } catch {
       setStatus(null)
     }
@@ -86,43 +106,30 @@ export function PushEnableBanner({ currentUser }: { currentUser: User }) {
         setHint(subscribed.error)
         return
       }
-      const controller = new AbortController()
-      const timer = window.setTimeout(() => controller.abort(), 12000)
-      let response: Response
-      try {
-        response = await fetch('/api/notify-self', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: currentUser.id }),
-          signal: controller.signal,
-        })
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('Der Test hat zu lange gedauert. App offen lassen und nochmal tippen.')
-        }
-        throw error
-      } finally {
-        window.clearTimeout(timer)
-      }
+      const response = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true, userId: currentUser.id }),
+      })
       const payload = await readJson(response)
       setHint(
         payload.ok
-          ? 'Test gesendet. App offen lassen — Ton oder Mitteilung sollte jetzt kommen. Erst danach die App zumachen und Sascha schreiben lassen.'
+          ? 'Test gesendet. App offen lassen — Ton oder Mitteilung sollte jetzt kommen.'
           : payload.error || `Test fehlgeschlagen (${response.status}).`,
       )
       await loadStatus()
     } catch (error) {
-      setHint(
-        error instanceof Error
-          ? `Test abgebrochen: ${error.message}`
-          : 'Test hat zu lange gedauert. App offen lassen und nochmal tippen.',
-      )
+      setHint(germanError(error))
     } finally {
       setBusy(false)
     }
   }
 
-  const ready = permission === 'granted' && status?.table === 'ok' && status.saved > 0 && status.hasPrivateKey
+  const ready =
+    permission === 'granted' &&
+    status?.table === 'ok' &&
+    status.saved > 0 &&
+    status.hasPrivateKey
   if (permission === 'unsupported') return null
 
   return (

@@ -12,6 +12,9 @@ function urlBase64ToUint8Array(base64: string) {
   for (let index = 0; index < raw.length; index += 1) {
     output[index] = raw.charCodeAt(index)
   }
+  if (output.length !== 65 || output[0] !== 0x04) {
+    throw new Error('VAPID-Schlüssel ist ungültig.')
+  }
   return output
 }
 

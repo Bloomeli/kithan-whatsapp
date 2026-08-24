@@ -20,6 +20,23 @@ export default async function handler(
   }
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+
+  if (body?.test && body?.userId) {
+    const result = await sendPushToUsers([String(body.userId)], {
+      title: 'Kithan',
+      body: 'Test: Mitteilungen funktionieren.',
+      tag: 'kithan-test',
+      url: '/',
+      unread: 1,
+    })
+    res.status(result.error && result.sent === 0 ? 500 : 200).json({
+      ok: result.sent > 0,
+      sent: result.sent,
+      error: result.error,
+    })
+    return
+  }
+
   const ticketId = String(body?.ticketId ?? '')
   const senderId = String(body?.senderId ?? '')
   const title = String(body?.title ?? 'Kithan')
