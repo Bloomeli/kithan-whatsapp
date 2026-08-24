@@ -1,4 +1,3 @@
-import { webcrypto } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 export const VAPID_PUBLIC_KEY =
@@ -23,14 +22,21 @@ export function supabaseAdmin() {
   return createClient(new URL(SUPABASE_URL).origin, SUPABASE_ANON_KEY)
 }
 
-function decodeB64Url(value: string) {
-  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4)
-  return Buffer.from(padded, 'base64')
+function encodeB64Url(data: Uint8Array | string) {
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-function encodeB64Url(data: Buffer | Uint8Array | string) {
-  const buf = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data)
-  return buf.toString('base64url')
+function decodeB64Url(value: string) {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4)
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
 }
 
 async function vapidAuthorization(endpoint: string) {
@@ -40,7 +46,7 @@ async function vapidAuthorization(endpoint: string) {
     throw new Error('VAPID_PRIVATE_KEY auf Vercel ist ungültig.')
   }
 
-  const key = await webcrypto.subtle.importKey(
+  const key = await crypto.subtle.importKey(
     'jwk',
     {
       kty: 'EC',
@@ -63,8 +69,8 @@ async function vapidAuthorization(endpoint: string) {
     }),
   )
   const unsigned = `${header}.${payload}`
-  const signature = Buffer.from(
-    await webcrypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, Buffer.from(unsigned)),
+  const signature = new Uint8Array(
+    await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(unsigned)),
   )
   return `vapid t=${unsigned}.${encodeB64Url(signature)}, k=${VAPID_PUBLIC_KEY}`
 }
@@ -89,7 +95,6 @@ async function sendApplePush(endpoint: string) {
 
 export async function sendPushToUsers(
   userIds: string[],
-  _payload: { title: string; body: string; tag?: string; url?: string; unread?: number },
 ): Promise<{ sent: number; error: string | null }> {
   if (!pushConfigured()) {
     return { sent: 0, error: 'Push ist nicht konfiguriert (VAPID_PRIVATE_KEY).' }

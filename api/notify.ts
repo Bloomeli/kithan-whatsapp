@@ -38,13 +38,7 @@ async function handleNotify(
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
 
   if (body?.test && body?.userId) {
-    const result = await sendPushToUsers([String(body.userId)], {
-      title: 'Kithan',
-      body: 'Test: Mitteilungen funktionieren.',
-      tag: 'kithan-test',
-      url: '/',
-      unread: 1,
-    })
+    const result = await sendPushToUsers([String(body.userId)])
     res.status(result.error && result.sent === 0 ? 500 : 200).json({
       ok: result.sent > 0,
       sent: result.sent,
@@ -55,9 +49,6 @@ async function handleNotify(
 
   const ticketId = String(body?.ticketId ?? '')
   const senderId = String(body?.senderId ?? '')
-  const title = String(body?.title ?? 'Kithan')
-  const text = String(body?.body ?? 'Neue Nachricht')
-  const url = String(body?.url ?? '/')
 
   if (!ticketId || !senderId) {
     res.status(400).json({ ok: false, error: 'ticketId und senderId fehlen.' })
@@ -84,13 +75,7 @@ async function handleNotify(
     ),
   ]
 
-  const result = await sendPushToUsers(recipientIds, {
-    title,
-    body: text,
-    tag: ticketId,
-    url,
-    unread: 1,
-  })
+  const result = await sendPushToUsers(recipientIds)
 
   res.status(result.error && result.sent === 0 ? 500 : 200).json({
     ok: result.sent > 0,

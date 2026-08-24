@@ -19,13 +19,7 @@ export default async function handler(
       return
     }
 
-    const result = await sendPushToUsers([userId], {
-      title: 'Kithan',
-      body: 'Test: Mitteilungen funktionieren.',
-      tag: 'kithan-test',
-      url: '/',
-      unread: 1,
-    })
+    const result = await sendPushToUsers([userId])
 
     res.status(result.error && result.sent === 0 ? 500 : 200).json({
       ok: result.sent > 0,
