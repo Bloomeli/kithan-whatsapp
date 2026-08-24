@@ -1,4 +1,4 @@
-import { sendPushToUsers } from './push-shared'
+import { sendPushToUsers } from './_lib/push'
 
 export default async function handler(
   req: { method?: string; body?: unknown },

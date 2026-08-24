@@ -1,4 +1,4 @@
-import { pushConfigured, sendPushToUsers, supabaseAdmin } from './push-shared'
+import { pushConfigured, sendPushToUsers, supabaseAdmin } from './_lib/push'
 
 export default async function handler(
   req: { method?: string; body?: unknown },

@@ -1,4 +1,4 @@
-import { pushConfigured, supabaseAdmin, VAPID_PRIVATE_KEY } from './push-shared'
+import { pushConfigured, supabaseAdmin, VAPID_PRIVATE_KEY } from './_lib/push'
 
 export default async function handler(
   req: { method?: string; query?: { userId?: string } },
