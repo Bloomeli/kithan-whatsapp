@@ -31,39 +31,52 @@ export async function subscribePushForUser(
   } catch {
     // Alte Home-Screen-App kann das Update überspringen
   }
-  const existing = await registration.pushManager.getSubscription()
-  const subscription =
-    existing ??
-    (await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    }))
 
-  const payload = subscription.toJSON()
-  if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) {
-    return { ok: false, error: 'Das iPhone hat kein Push-Abo erzeugt.' }
-  }
+  try {
+    const existing = await registration.pushManager.getSubscription()
+    const subscription =
+      existing ??
+      (await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      }))
 
-  const { error } = await supabase.from('push_subscriptions').upsert(
-    {
-      user_id: userId,
-      endpoint: payload.endpoint,
-      p256dh: payload.keys.p256dh,
-      auth: payload.keys.auth,
-    },
-    { onConflict: 'endpoint' },
-  )
-
-  if (error) {
-    return {
-      ok: false,
-      error: error.message.includes('does not exist')
-        ? 'Tabelle push_subscriptions fehlt. SQL in Supabase ausführen.'
-        : `Abo konnte nicht gespeichert werden. ${error.message}`,
+    const payload = subscription.toJSON()
+    if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) {
+      return { ok: false, error: 'Das iPhone hat kein Push-Abo erzeugt.' }
     }
-  }
 
-  return { ok: true, error: null }
+    const { error } = await supabase.from('push_subscriptions').upsert(
+      {
+        user_id: userId,
+        endpoint: payload.endpoint,
+        p256dh: payload.keys.p256dh,
+        auth: payload.keys.auth,
+      },
+      { onConflict: 'endpoint' },
+    )
+
+    if (error) {
+      return {
+        ok: false,
+        error: error.message.includes('does not exist')
+          ? 'Tabelle push_subscriptions fehlt. SQL in Supabase ausführen.'
+          : `Abo konnte nicht gespeichert werden. ${error.message}`,
+      }
+    }
+
+    return { ok: true, error: null }
+  } catch (error) {
+    const text = error instanceof Error ? error.message : ''
+    if (/pattern/i.test(text) || /abort/i.test(text)) {
+      return {
+        ok: false,
+        error:
+          'iPhone hat das Abo abgelehnt. App vom Home-Bildschirm öffnen, Mitteilungen erlauben, dann nochmal testen.',
+      }
+    }
+    return { ok: false, error: text || 'Push-Abo ist fehlgeschlagen.' }
+  }
 }
 
 export async function notifyTicketMembers(input: {

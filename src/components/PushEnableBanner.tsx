@@ -17,7 +17,18 @@ function notificationState(): NotificationPermission | 'unsupported' {
   return Notification.permission
 }
 
-type PushStatus = {
+async function readJson(response: Response) {
+  const text = await response.text()
+  try {
+    return JSON.parse(text) as { ok?: boolean; error?: string; hasPrivateKey?: boolean; table?: string; saved?: number }
+  } catch {
+    throw new Error(
+      text.trim().startsWith('<')
+        ? `Server ${response.status}: keine JSON-Antwort. Push-Funktion auf Vercel prüfen.`
+        : `Server ${response.status}: ${text.slice(0, 120) || 'leere Antwort'}`,
+    )
+  }
+}
   hasPrivateKey: boolean
   table: 'ok' | 'missing' | 'error'
   saved: number
@@ -41,7 +52,7 @@ export function PushEnableBanner({ currentUser }: { currentUser: User }) {
   async function loadStatus() {
     try {
       const response = await fetch(`/api/push-status?userId=${currentUser.id}`)
-      const payload = (await response.json()) as PushStatus
+      const payload = await readJson(response)
       setStatus(payload)
     } catch {
       setStatus(null)
@@ -75,17 +86,29 @@ export function PushEnableBanner({ currentUser }: { currentUser: User }) {
         setHint(subscribed.error)
         return
       }
-      const response = await fetch('/api/notify-self', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUser.id }),
-        signal: AbortSignal.timeout(12000),
-      })
-      const payload = (await response.json()) as { ok?: boolean; error?: string }
+      const controller = new AbortController()
+      const timer = window.setTimeout(() => controller.abort(), 12000)
+      let response: Response
+      try {
+        response = await fetch('/api/notify-self', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUser.id }),
+          signal: controller.signal,
+        })
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw new Error('Der Test hat zu lange gedauert. App offen lassen und nochmal tippen.')
+        }
+        throw error
+      } finally {
+        window.clearTimeout(timer)
+      }
+      const payload = await readJson(response)
       setHint(
         payload.ok
           ? 'Test gesendet. App offen lassen — Ton oder Mitteilung sollte jetzt kommen. Erst danach die App zumachen und Sascha schreiben lassen.'
-          : payload.error || 'Test fehlgeschlagen.',
+          : payload.error || `Test fehlgeschlagen (${response.status}).`,
       )
       await loadStatus()
     } catch (error) {
