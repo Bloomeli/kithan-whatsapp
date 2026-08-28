@@ -234,6 +234,7 @@ export function CreateTicketModal({
                   Dringlichkeit
                 </span>
                 <NeonSelect
+                  variant="dropdown"
                   value={priority}
                   disabled={saving}
                   fieldClass={FIELD_CLASS}
@@ -287,6 +288,7 @@ export function CreateTicketModal({
                   Gebäude
                 </span>
                 <NeonSelect
+                  variant="dropdown"
                   value={buildingId}
                   disabled={saving}
                   fieldClass={FIELD_CLASS}

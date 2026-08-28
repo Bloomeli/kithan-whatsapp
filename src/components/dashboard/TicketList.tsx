@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { PRIORITY_LABELS, STATUS_LABELS } from '../../lib/labels'
+import { getObjektLabel } from '../../lib/objekte'
 import {
   ARCHIVE_DELETE_AFTER_DAYS,
   deleteTicketCompletely,
@@ -207,6 +208,8 @@ function TicketRow({
   const statusText = ticket.status
     .map((status) => STATUS_LABELS[status] ?? status)
     .join(' · ')
+  const buildingLine =
+    ticket.building_label?.trim() || getObjektLabel(ticket.building_id)
   const overdue = archived && needsArchiveDeleteReminder(ticket)
   const timerRef = useRef<number | null>(null)
   const longPressRef = useRef(false)
@@ -243,7 +246,7 @@ function TicketRow({
         onPointerCancel={clearTimer}
         onPointerLeave={clearTimer}
         onContextMenu={(event) => event.preventDefault()}
-        aria-label={`${ticket.title}, ${PRIORITY_LABELS[ticket.priority]}, ${statusText}. Lange drücken zum Korrigieren.`}
+        aria-label={`${ticket.title}${buildingLine ? `, ${buildingLine}` : ''}, ${PRIORITY_LABELS[ticket.priority]}, ${statusText}. Lange drücken zum Korrigieren.`}
         className="flex min-w-0 flex-1 items-stretch text-left transition select-none active:bg-neutral-900"
       >
         <span
@@ -252,10 +255,10 @@ function TicketRow({
             archived ? 'bg-archive shadow-[0_0_10px_#aff903]' : PRIORITY_BAR[ticket.priority]
           }`}
         />
-        <span className="flex min-w-0 flex-1 items-center gap-3 border-b border-neutral-800 px-3 py-3.5 pr-3">
+        <span className="flex min-w-0 flex-1 items-start gap-3 border-b border-neutral-800 px-3 py-4 pr-3">
           <span
             aria-hidden
-            className={`h-3.5 w-3.5 shrink-0 rounded-full ${
+            className={`mt-1.5 h-3.5 w-3.5 shrink-0 rounded-full ${
               archived
                 ? 'bg-archive shadow-[0_0_12px_#aff903]'
                 : PRIORITY_DOT[ticket.priority]
@@ -265,6 +268,11 @@ function TicketRow({
             <span className="block truncate text-[15px] font-semibold text-white">
               {ticket.title}
             </span>
+            {buildingLine ? (
+              <span className="mt-0.5 block truncate text-[13px] text-neutral-300">
+                {buildingLine}
+              </span>
+            ) : null}
             <span className="mt-0.5 block truncate text-[13px] text-neutral-400">
               {statusText || 'Kein Status'}
             </span>
@@ -277,14 +285,14 @@ function TicketRow({
           {formatUnreadBadge(unreadCount) ? (
             <span
               aria-label={`${unreadCount} ungelesene Nachrichten`}
-              className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#FF3B30] px-1.5 text-[11px] font-bold text-white"
+              className="mt-1 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#FF3B30] px-1.5 text-[11px] font-bold text-white"
             >
               {formatUnreadBadge(unreadCount)}
             </span>
           ) : null}
           <time
             dateTime={ticket.updated_at}
-            className="shrink-0 text-[11px] text-neutral-500"
+            className="mt-1 shrink-0 text-[11px] text-neutral-500"
           >
             {formatListTime(ticket.updated_at)}
           </time>
@@ -311,11 +319,12 @@ function TicketListSkeleton() {
       {Array.from({ length: 6 }, (_, index) => (
         <li
           key={index}
-          className="flex items-center gap-3 border-b border-neutral-800 px-4 py-3.5"
+          className="flex items-center gap-3 border-b border-neutral-800 px-4 py-4"
         >
           <span className="h-3 w-3 shrink-0 rounded-full bg-neutral-800" />
           <span className="flex flex-1 flex-col gap-2">
             <span className="h-3.5 w-2/3 rounded bg-neutral-800" />
+            <span className="h-3 w-1/2 rounded bg-neutral-800" />
             <span className="h-3 w-1/3 rounded bg-neutral-900" />
           </span>
         </li>
