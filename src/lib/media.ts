@@ -30,12 +30,17 @@ export async function prepareChatMedia(file: File): Promise<{
   throw new Error('Nur Fotos und Videos können hochgeladen werden.')
 }
 
-export async function uploadChatMedia(ticketId: string, file: File): Promise<string> {
+export async function uploadChatMedia(
+  ticketId: string,
+  file: File,
+  storageFileName?: string,
+): Promise<string> {
   const extension = extensionFromFile(file)
-  const path = `${ticketId}/${crypto.randomUUID()}.${extension}`
+  const fileName = sanitizeStorageFileName(storageFileName) ?? `${crypto.randomUUID()}.${extension}`
+  const path = `${ticketId}/${fileName}`
 
   if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    return uploadViaVercel(ticketId, file, extension)
+    return uploadViaVercel(ticketId, file, extension, fileName)
   }
 
   const { error } = await supabase.storage.from(CHAT_MEDIA_BUCKET).upload(path, file, {
@@ -53,7 +58,12 @@ export async function uploadChatMedia(ticketId: string, file: File): Promise<str
   return data.publicUrl
 }
 
-async function uploadViaVercel(ticketId: string, file: File, extension: string) {
+async function uploadViaVercel(
+  ticketId: string,
+  file: File,
+  extension: string,
+  fileName: string,
+) {
   const data = await fileToBase64(file)
   const response = await fetch('/api/upload', {
     method: 'POST',
@@ -61,6 +71,7 @@ async function uploadViaVercel(ticketId: string, file: File, extension: string) 
     body: JSON.stringify({
       ticketId,
       extension,
+      fileName,
       contentType: file.type || 'application/octet-stream',
       data,
     }),
@@ -305,4 +316,49 @@ function renameExtension(name: string, mime: string) {
   if (mime === 'image/webp') return `${base}.webp`
   if (mime === 'image/jpeg') return `${base}.jpg`
   return name
+}
+
+function windowsSafeSegment(value: string) {
+  const transliterated = value
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/Ä/g, 'Ae')
+    .replace(/Ö/g, 'Oe')
+    .replace(/Ü/g, 'Ue')
+    .replace(/ß/g, 'ss')
+  return transliterated
+    .replace(/[<>:"/\\|?*]/g, '')
+    .replace(/[\u0000-\u001f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^A-Za-z0-9._-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^[.-]+|[.-]+$/g, '')
+    .slice(0, 48) || 'Datei'
+}
+
+export function buildChatMediaFileName(input: {
+  title: string
+  buildingLabel: string | null
+  sequence: number
+  extension: string
+}): string {
+  const problem = windowsSafeSegment(input.title)
+  const street = windowsSafeSegment(input.buildingLabel?.split(',')[0] ?? '')
+  const date = new Date().toISOString().slice(0, 10)
+  const n = String(Math.max(1, input.sequence)).padStart(3, '0')
+  const extension = input.extension.replace(/[^a-z0-9]/gi, '').toLowerCase() || 'bin'
+  return `${problem}_${street}_${date}_${n}.${extension}`
+}
+
+export function extensionFromPreparedFile(file: File) {
+  return extensionFromFile(file)
+}
+
+function sanitizeStorageFileName(name: string | undefined) {
+  if (!name) return null
+  const trimmed = name.replace(/\\/g, '/').split('/').pop() ?? ''
+  const safe = trimmed.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').slice(0, 120)
+  if (!safe || safe === '.' || safe === '..') return null
+  return safe
 }

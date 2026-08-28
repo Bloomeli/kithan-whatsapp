@@ -30,6 +30,16 @@ export default async function handler(
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
   const ticketId = String(body?.ticketId ?? '')
   const extension = String(body?.extension ?? 'bin').replace(/[^a-z0-9]/gi, '') || 'bin'
+  const requestedName = String(body?.fileName ?? '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .pop()
+    ?.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+    .slice(0, 120)
+  const fileName =
+    requestedName && requestedName !== '.' && requestedName !== '..'
+      ? requestedName
+      : `${crypto.randomUUID()}.${extension}`
   const contentType = String(body?.contentType ?? 'application/octet-stream')
   const data = String(body?.data ?? '')
 
@@ -45,7 +55,7 @@ export default async function handler(
   }
 
   const origin = projectOrigin()
-  const path = `${ticketId}/${crypto.randomUUID()}.${extension}`
+  const path = `${ticketId}/${fileName}`
   const supabase = createClient(origin, SUPABASE_ANON_KEY)
   const { error } = await supabase.storage.from('chat-media').upload(path, fileBytes, {
     contentType,

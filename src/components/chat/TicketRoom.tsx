@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { prepareChatMedia, uploadChatMedia } from '../../lib/media'
+import { buildChatMediaFileName, extensionFromPreparedFile, prepareChatMedia, uploadChatMedia } from '../../lib/media'
 import { notifyTicketMembers } from '../../lib/push'
 import { bindRealtimeCatchUp } from '../../lib/realtime'
 import { supabase } from '../../lib/supabase'
@@ -333,14 +333,20 @@ export function TicketRoom({
       if (file) {
         const prepared = await prepareChatMedia(file)
         setStatusText('Upload läuft…')
-        mediaUrl = await uploadChatMedia(ticket.id, prepared.file)
+        const sequence = messages.filter((entry) => entry.media_type).length + 1
+        const fileName = buildChatMediaFileName({
+          title: ticket.title,
+          buildingLabel: ticket.building_label,
+          sequence,
+          extension: extensionFromPreparedFile(prepared.file),
+        })
+        mediaUrl = await uploadChatMedia(ticket.id, prepared.file, fileName)
         mediaType = prepared.mediaType
       }
 
       const content =
         text.trim() ||
-        mediaOriginLabel(ticket) ||
-        (mediaType === 'video' ? 'Video' : mediaType === 'image' ? 'Foto' : '')
+        (mediaType === 'video' ? 'Video –' : mediaType === 'image' ? 'Foto –' : '')
 
       const { data, error: insertError } = await supabase
         .from('messages')
@@ -369,8 +375,7 @@ export function TicketRoom({
 
       const preview =
         text.trim() ||
-        mediaOriginLabel(ticket) ||
-        (mediaType === 'video' ? 'Video' : mediaType === 'image' ? 'Foto' : 'Nachricht')
+        (mediaType === 'video' ? 'Video –' : mediaType === 'image' ? 'Foto –' : 'Nachricht')
       void notifyTicketMembers({
         ticketId: ticket.id,
         senderId: currentUser.id,
@@ -391,10 +396,10 @@ export function TicketRoom({
   }
 
   return (
-    <div className="flex h-svh flex-col bg-black text-white">
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <header className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950 px-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-          <div className="flex items-center gap-1">
+    <div className="flex h-svh w-full min-w-0 flex-col bg-black text-white">
+      <div className="min-h-0 min-w-0 w-full flex-1 overflow-y-auto">
+        <header className="sticky top-0 z-10 w-full min-w-0 border-b border-neutral-800 bg-neutral-950 px-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="flex w-full min-w-0 items-center gap-1">
             <button
               type="button"
               onClick={onBack}
@@ -442,7 +447,7 @@ export function TicketRoom({
           </div>
         </header>
 
-        <div className="px-3 pb-2 pt-1.5">
+        <div className="w-full min-w-0 px-3 pb-2 pt-1.5">
           <TicketMetaSelect
             status={currentStatus}
             priority={ticket.priority}
@@ -567,12 +572,6 @@ function mergeMessages(current: Message[], incoming: Message[]): Message[] {
   )
 }
 
-function mediaOriginLabel(ticket: Ticket): string {
-  const street = ticket.building_label?.split(',')[0]?.trim() ?? ''
-  const unit = ticket.unit_location?.trim() ?? ''
-  return [street, unit].filter(Boolean).join(', ')
-}
-
 function TicketIncidentSummary({ ticket }: { ticket: Ticket }) {
   const lines = [
     ticket.building_label,
@@ -587,7 +586,7 @@ function TicketIncidentSummary({ ticket }: { ticket: Ticket }) {
   if (lines.length === 0) return null
 
   return (
-    <div className="mt-1.5 space-y-0 text-[11px] leading-snug text-neutral-400">
+    <div className="mt-1.5 min-w-0 space-y-0 text-[11px] leading-snug text-neutral-400">
       {lines.map((line) => (
         <p key={line} className="truncate">
           {line}

@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { isChatMediaExpired, MEDIA_TTL_HOURS } from '../../lib/mediaTtl'
 import type { ReceiptStatus } from '../../lib/unread'
 import type { MediaType, Message } from '../../types'
 
@@ -17,36 +16,33 @@ export function MessageBubble({
   receipt,
 }: MessageBubbleProps) {
   return (
-    <article className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
+    <article className={`flex w-full min-w-0 ${isOwn ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[82%] rounded-2xl px-3 py-2 ${
+        className={`min-w-0 max-w-[82%] rounded-2xl px-3 py-2 ${
           isOwn
             ? 'rounded-br-sm bg-primary text-white'
             : 'rounded-bl-sm bg-neutral-800 text-white'
         }`}
       >
         {isOwn ? null : (
-          <p className="mb-1 text-[11px] font-semibold text-neutral-300">
+          <p className="mb-1 min-w-0 truncate text-[11px] font-semibold text-neutral-300">
             {authorName}
           </p>
         )}
-        {message.media_url && message.media_type && !isChatMediaExpired(message.created_at) ? (
+        {message.media_url && message.media_type ? (
           <MediaAttachment url={message.media_url} type={message.media_type} />
         ) : null}
-        {message.media_type &&
-        (!message.media_url || isChatMediaExpired(message.created_at)) ? (
+        {message.media_type && !message.media_url ? (
           <p
             className={`mb-1 text-[12px] leading-snug ${
               isOwn ? 'text-white/70' : 'text-neutral-400'
             }`}
           >
-            {message.media_type === 'video'
-              ? `Video nach ${MEDIA_TTL_HOURS} Stunden gelöscht`
-              : `Foto nach ${MEDIA_TTL_HOURS} Stunden gelöscht`}
+            {message.media_type === 'video' ? 'Video nicht verfügbar' : 'Foto nicht verfügbar'}
           </p>
         ) : null}
         {message.content.trim() ? (
-          <p className="whitespace-pre-wrap break-words text-[15px] leading-snug">
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[15px] leading-snug">
             {message.content}
           </p>
         ) : null}
@@ -82,13 +78,13 @@ function ImagePreview({ url }: { url: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mb-1 block w-full overflow-hidden rounded-lg"
+        className="mb-1 block w-full max-w-full overflow-hidden rounded-lg"
         aria-label="Foto vergrößern"
       >
         <img
           src={url}
           alt="Foto"
-          className="max-h-64 w-full object-cover"
+          className="max-h-64 w-full max-w-full object-cover"
         />
       </button>
       {open ? (
@@ -119,14 +115,14 @@ function VideoPreview({ url }: { url: string }) {
   }
 
   return (
-    <div className="relative mb-1 overflow-hidden rounded-lg bg-black">
+    <div className="relative mb-1 max-w-full overflow-hidden rounded-lg bg-black">
       <video
         ref={videoRef}
         src={url}
         playsInline
         preload="metadata"
         controls={playing}
-        className="max-h-64 w-full"
+        className="max-h-64 w-full max-w-full"
         onPlay={() => setPlaying(true)}
         onEnded={() => setPlaying(false)}
       />

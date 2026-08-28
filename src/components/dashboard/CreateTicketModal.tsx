@@ -8,7 +8,7 @@ import {
 } from '../../lib/labels'
 import { getObjektLabel, OBJEKTE } from '../../lib/objekte'
 import { supabase } from '../../lib/supabase'
-import { createTicketForUser } from '../../lib/tickets'
+import { createTicketForUser, isoToDateInput, isoToTimeInput, parseOccurredAt } from '../../lib/tickets'
 import type { Ticket, TicketPriority, TicketStatus, User } from '../../types'
 import { InsuranceFields } from '../tickets/InsuranceFields'
 
@@ -20,6 +20,9 @@ interface CreateTicketModalProps {
 
 const FIELD_CLASS =
   'h-12 w-full appearance-none rounded-xl border border-neutral-800 bg-black px-4 text-base text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
+
+const DATE_TIME_CLASS =
+  'h-12 w-full rounded-xl border border-neutral-800 bg-black px-3 text-base text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
 
 export function CreateTicketModal({
   currentUser,
@@ -37,8 +40,8 @@ export function CreateTicketModal({
   const [tenantName, setTenantName] = useState('')
   const [contact, setContact] = useState('')
   const [remarks, setRemarks] = useState('')
-  const [occurredDate, setOccurredDate] = useState('')
-  const [occurredTime, setOccurredTime] = useState('')
+  const [occurredDate, setOccurredDate] = useState(() => isoToDateInput(new Date().toISOString()))
+  const [occurredTime, setOccurredTime] = useState(() => isoToTimeInput(new Date().toISOString()))
   const [reportedBy, setReportedBy] = useState('')
   const [insuranceDamage, setInsuranceDamage] = useState(false)
   const [situation, setSituation] = useState('')
@@ -85,7 +88,7 @@ export function CreateTicketModal({
       return
     }
 
-    const occurredAt = new Date(`${occurredDate}T${occurredTime}`)
+    const occurredAt = parseOccurredAt(occurredDate, occurredTime)
     if (Number.isNaN(occurredAt.getTime())) {
       setError('Bitte Datum und Uhrzeit prüfen.')
       return
@@ -377,7 +380,7 @@ export function CreateTicketModal({
                     onChange={(event) => setOccurredDate(event.target.value)}
                     required
                     disabled={saving}
-                    className={FIELD_CLASS}
+                    className={DATE_TIME_CLASS}
                   />
                 </label>
                 <label className="flex flex-col gap-2">
@@ -389,8 +392,9 @@ export function CreateTicketModal({
                     value={occurredTime}
                     onChange={(event) => setOccurredTime(event.target.value)}
                     required
+                    step="60"
                     disabled={saving}
-                    className={FIELD_CLASS}
+                    className={DATE_TIME_CLASS}
                   />
                 </label>
               </div>

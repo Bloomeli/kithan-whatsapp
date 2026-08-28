@@ -7,7 +7,7 @@ import {
   TICKET_STATUSES,
 } from '../../lib/labels'
 import { getObjektLabel, OBJEKTE } from '../../lib/objekte'
-import { isoToDateInput, isoToTimeInput, updateTicketDetails } from '../../lib/tickets'
+import { isoToDateInput, isoToTimeInput, parseOccurredAt, updateTicketDetails } from '../../lib/tickets'
 import type { Ticket, TicketPriority, TicketStatus } from '../../types'
 import { InsuranceFields } from '../tickets/InsuranceFields'
 
@@ -19,6 +19,9 @@ interface EditTicketModalProps {
 
 const FIELD_CLASS =
   'h-12 w-full appearance-none rounded-xl border border-neutral-800 bg-black px-4 text-base text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
+
+const DATE_TIME_CLASS =
+  'h-12 w-full rounded-xl border border-neutral-800 bg-black px-3 text-base text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
 
 export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalProps) {
   const [title, setTitle] = useState(ticket.title)
@@ -49,7 +52,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
     event.preventDefault()
     if (saving || !priority || !buildingId || !occurredDate || !occurredTime) return
 
-    const occurredAt = new Date(`${occurredDate}T${occurredTime}`)
+    const occurredAt = parseOccurredAt(occurredDate, occurredTime)
     if (Number.isNaN(occurredAt.getTime())) {
       setError('Bitte Datum und Uhrzeit prüfen.')
       return
@@ -258,7 +261,7 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
                 onChange={(event) => setOccurredDate(event.target.value)}
                 required
                 disabled={saving}
-                className={FIELD_CLASS}
+                className={DATE_TIME_CLASS}
               />
             </label>
             <label className="flex flex-col gap-2">
@@ -268,8 +271,9 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
                 value={occurredTime}
                 onChange={(event) => setOccurredTime(event.target.value)}
                 required
+                step="60"
                 disabled={saving}
-                className={FIELD_CLASS}
+                className={DATE_TIME_CLASS}
               />
             </label>
           </div>

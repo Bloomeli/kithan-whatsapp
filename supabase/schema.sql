@@ -264,27 +264,15 @@ create policy chat_media_delete
   to anon, authenticated
   using (bucket_id = 'chat-media');
 
--- Vorläufig: Fotos/Videos nach 36 Stunden löschen (Speicherlimit).
+-- Medien bleiben gespeichert, bis jemand sie ausdrücklich löscht.
 create or replace function public.purge_expired_chat_media()
 returns integer
 language plpgsql
 security definer
 set search_path = public, storage
 as $$
-declare
-  updated_count integer;
 begin
-  delete from storage.objects
-  where bucket_id = 'chat-media'
-    and created_at < now() - interval '36 hours';
-
-  update public.messages
-  set media_url = null
-  where media_url is not null
-    and created_at < now() - interval '36 hours';
-
-  get diagnostics updated_count = row_count;
-  return updated_count;
+  return 0;
 end;
 $$;
 

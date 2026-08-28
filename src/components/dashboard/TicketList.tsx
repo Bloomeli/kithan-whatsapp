@@ -104,7 +104,7 @@ export function TicketList({
   const overdueCount = tickets.filter(needsArchiveDeleteReminder).length
 
   return (
-    <section className="relative flex min-h-0 flex-1 flex-col bg-black">
+    <section className="relative flex min-h-0 min-w-0 w-full flex-1 flex-col bg-black">
       {showArchived && overdueCount > 0 ? (
         <p className="mx-4 mt-3 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
           {overdueCount === 1
@@ -229,7 +229,7 @@ function TicketRow({
 
   return (
     <div
-      className={`flex w-full items-stretch ${
+      className={`flex w-full min-w-0 items-stretch ${
         selected ? 'bg-neutral-900' : 'bg-black'
       }`}
     >

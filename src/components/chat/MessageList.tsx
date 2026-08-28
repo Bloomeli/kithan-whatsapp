@@ -19,7 +19,7 @@ export function MessageList({
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' })
   }, [messages.length])
 
   if (messages.length === 0) {
@@ -31,7 +31,7 @@ export function MessageList({
   }
 
   return (
-    <div className="flex flex-col gap-2 px-3 py-3">
+    <div className="flex w-full min-w-0 flex-col gap-2 px-3 py-3">
       {messages.map((message) => (
         <MessageBubble
           key={message.id}

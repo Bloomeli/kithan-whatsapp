@@ -11,7 +11,6 @@ import { OfflineBanner } from './components/OfflineBanner'
 import { PushEnableBanner } from './components/PushEnableBanner'
 import { MessageToast } from './components/ui/MessageToast'
 import { useIncomingAlerts } from './hooks/useIncomingAlerts'
-import { purgeExpiredChatMedia } from './lib/mediaTtl'
 import {
   fetchAccessibleTicket,
   parseTicketHash,
@@ -37,11 +36,6 @@ function App() {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    if (!currentUser) return
-    void purgeExpiredChatMedia()
-  }, [currentUser])
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
@@ -159,7 +153,7 @@ function App() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-black text-white">
+    <div className="flex min-h-svh w-full min-w-0 flex-col bg-black text-white">
       <OfflineBanner />
       {toast ? (
         <MessageToast
@@ -169,7 +163,7 @@ function App() {
         />
       ) : null}
       <header
-        className={`flex justify-between gap-3 border-b border-neutral-800 bg-neutral-950 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
+        className={`flex w-full min-w-0 justify-between gap-3 border-b border-neutral-800 bg-neutral-950 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${
           showArchived ? 'items-start' : 'items-center'
         }`}
       >

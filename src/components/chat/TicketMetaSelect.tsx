@@ -9,7 +9,7 @@ import {
 import type { TicketPriority, TicketStatus } from '../../types'
 
 const FIELD_CLASS =
-  'h-11 w-full appearance-none rounded-xl border border-neutral-800 bg-black px-3 text-sm text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
+  'h-11 w-full min-w-0 appearance-none rounded-xl border border-neutral-800 bg-black px-3 text-sm text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
 
 const SITUATION_CLASS =
   'min-h-[4.25rem] w-full resize-none rounded-xl border border-neutral-800 bg-black px-3 py-2 text-sm text-white outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50'
@@ -56,7 +56,7 @@ export function TicketMetaSelect({
     : [status, ...TICKET_STATUSES]
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex w-full min-w-0 flex-col gap-1.5">
       <div className="flex flex-col gap-0.5">
         <span className="text-[11px] font-medium text-neutral-400">Dringlichkeit</span>
         <NeonSelect
@@ -79,7 +79,7 @@ export function TicketMetaSelect({
         onInsuranceChange={onInsuranceChange}
       />
 
-      <div className="flex items-end gap-2">
+      <div className="flex min-w-0 items-end gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[11px] font-medium text-neutral-400">Status</span>
           <NeonSelect

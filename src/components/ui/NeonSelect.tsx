@@ -65,14 +65,14 @@ export function NeonSelect({
   }, [open])
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative w-full min-w-0">
       <button
         type="button"
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`${fieldClass} flex items-center text-left`}
+        className={`${fieldClass} flex min-w-0 items-center text-left`}
       >
         <span
           className={`min-w-0 truncate ${

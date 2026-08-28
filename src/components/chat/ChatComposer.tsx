@@ -125,7 +125,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
     <>
       <form
         onSubmit={handleSubmit}
-        className="border-t border-neutral-800 bg-neutral-950 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
+        className="w-full min-w-0 border-t border-neutral-800 bg-neutral-950 pt-2 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
         {pending && !previewOpen ? (
           <p className="truncate pb-1 text-xs text-neutral-400">
@@ -159,7 +159,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
           <p className="pb-1 text-xs text-primary">{statusText}</p>
         ) : null}
 
-        <div className="flex items-end gap-1.5">
+        <div className="flex min-w-0 items-end gap-1.5">
           <input
             ref={photoRef}
             type="file"
@@ -198,7 +198,7 @@ export function ChatComposer({ sending, statusText, error, onSend }: ChatCompose
             placeholder="Nachricht"
             rows={1}
             disabled={sending}
-            className="max-h-28 min-h-11 flex-1 resize-none rounded-2xl border border-neutral-800 bg-black px-3 py-2.5 text-[15px] text-white outline-none placeholder:text-neutral-500 focus:border-primary"
+            className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-2xl border border-neutral-800 bg-black px-3 py-2.5 text-[15px] text-white outline-none placeholder:text-neutral-500 focus:border-primary"
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
