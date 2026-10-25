@@ -3,9 +3,10 @@ import { PRIORITY_LABELS, STATUS_LABELS } from '../../lib/labels'
 import { getObjektLabel } from '../../lib/objekte'
 import {
   ARCHIVE_DELETE_AFTER_DAYS,
+  deleteExportedTicketsPastRetention,
   deleteTicketCompletely,
   fetchTicketsForMember,
-  needsArchiveDeleteReminder,
+  needsCompanyUploadReminder,
 } from '../../lib/tickets'
 import { formatUnreadBadge } from '../../lib/unread'
 import type { Ticket, TicketPriority, User } from '../../types'
@@ -59,6 +60,8 @@ export function TicketList({
       setLoading(true)
       setError(null)
 
+      await deleteExportedTicketsPastRetention()
+
       const { tickets: nextTickets, error: queryError } =
         await fetchTicketsForMember(currentUser.id, showArchived)
 
@@ -102,15 +105,15 @@ export function TicketList({
     setDeleting(null)
   }
 
-  const overdueCount = tickets.filter(needsArchiveDeleteReminder).length
+  const overdueCount = tickets.filter(needsCompanyUploadReminder).length
 
   return (
     <section className="relative flex min-h-0 min-w-0 w-full flex-1 flex-col bg-black">
       {showArchived && overdueCount > 0 ? (
         <p className="mx-4 mt-3 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
           {overdueCount === 1
-            ? `Ein archivierter Problemraum liegt seit ${ARCHIVE_DELETE_AFTER_DAYS} Tagen auf dem Server. Bitte löschen.`
-            : `${overdueCount} archivierte Problemräume liegen seit ${ARCHIVE_DELETE_AFTER_DAYS} Tagen auf dem Server. Bitte löschen.`}
+            ? `Ein Problemraum liegt seit mindestens ${ARCHIVE_DELETE_AFTER_DAYS} Tagen im Archiv. Bitte auf den Firmenserver hochladen.`
+            : `${overdueCount} Problemräume liegen seit mindestens ${ARCHIVE_DELETE_AFTER_DAYS} Tagen im Archiv. Bitte auf den Firmenserver hochladen.`}
         </p>
       ) : null}
 
@@ -210,7 +213,7 @@ function TicketRow({
     .join(' · ')
   const buildingLine =
     ticket.building_label?.trim() || getObjektLabel(ticket.building_id)
-  const overdue = archived && needsArchiveDeleteReminder(ticket)
+  const overdue = archived && needsCompanyUploadReminder(ticket)
   const timerRef = useRef<number | null>(null)
   const longPressRef = useRef(false)
 
@@ -278,7 +281,7 @@ function TicketRow({
             </span>
             {overdue ? (
               <span className="mt-0.5 block text-[12px] font-medium text-yellow-300">
-                Bitte löschen
+                Bitte hochladen
               </span>
             ) : null}
           </span>

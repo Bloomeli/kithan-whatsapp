@@ -51,6 +51,7 @@ create table public.tickets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   archived_at timestamptz,
+  exported_at timestamptz,
   building_id text,
   building_label text,
   unit_location text,
@@ -70,7 +71,8 @@ create index tickets_created_at_idx on public.tickets (created_at desc);
 comment on table public.tickets is 'Problemräume. archived = true verschiebt das Ticket in den Archiv-Bereich.';
 comment on column public.tickets.status is 'Arbeits-Status als Array. Die UI speichert in der Regel einen Wert. Archiv läuft über archived, nicht über diesen Enum.';
 comment on column public.tickets.archived is 'true = Archiv (Neongrün-Markierung in der UI), false = aktive Liste.';
-comment on column public.tickets.archived_at is 'Zeitpunkt der Archivierung. Nach 14 Tagen erinnert die UI zum manuellen Löschen.';
+comment on column public.tickets.archived_at is 'Zeitpunkt der Archivierung. Ohne Firmenserver-Upload erinnert die UI nach 14 Tagen zum Hochladen.';
+comment on column public.tickets.exported_at is 'Zeitpunkt des erfolgreichen Uploads auf den Firmenserver. 14 Tage danach wird der Problemraum in Supabase gelöscht.';
 comment on column public.tickets.building_id is 'Objekt-ID aus der Vermietungs-App (Wohnung/Einheit).';
 comment on column public.tickets.building_label is 'Adress-Label zum Zeitpunkt der Erstellung.';
 comment on column public.tickets.unit_location is 'Bereich, Stockwerk oder Mietfläche innerhalb des Gebäudes.';

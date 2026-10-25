@@ -3,7 +3,7 @@ import { addInsuranceHandlers, getInsuranceHandlerUsers } from './staff'
 import { CHAT_MEDIA_BUCKET, type Ticket, type TicketPriority, type TicketStatus } from '../types'
 
 const TICKET_COLUMNS =
-  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, archived_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation, contact'
+  'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, archived_at, exported_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation, contact'
 
 export const ARCHIVE_DELETE_AFTER_DAYS = 14
 const ARCHIVE_DELETE_AFTER_MS = ARCHIVE_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000
@@ -60,7 +60,11 @@ export async function fetchTicketsForMember(
     return { tickets: [], error: 'Problemräume konnten nicht geladen werden.' }
   }
 
-  return { tickets: data ?? [], error: null }
+  return { tickets: (data ?? []).map(withExportStamp), error: null }
+}
+
+function withExportStamp(ticket: Ticket): Ticket {
+  return { ...ticket, exported_at: ticket.exported_at ?? null }
 }
 
 export async function fetchAccessibleTicket(
@@ -85,7 +89,7 @@ export async function fetchAccessibleTicket(
   if (!membership && data.created_by !== userId) return null
 
   await ensureTicketMembership(ticketId, userId)
-  return data
+  return withExportStamp(data)
 }
 
 export async function createTicketForUser(input: {
@@ -261,12 +265,36 @@ export async function deleteTicketCompletely(
   return { error: null }
 }
 
-export function needsArchiveDeleteReminder(ticket: Ticket): boolean {
-  if (!ticket.archived) return false
+export function needsCompanyUploadReminder(ticket: Ticket): boolean {
+  if (!ticket.archived || ticket.exported_at) return false
   const start = ticket.archived_at ?? ticket.updated_at
   const at = new Date(start).getTime()
   if (Number.isNaN(at)) return false
   return Date.now() - at >= ARCHIVE_DELETE_AFTER_MS
+}
+
+export function isReadyForExportCleanup(ticket: Pick<Ticket, 'exported_at'>): boolean {
+  if (!ticket.exported_at) return false
+  const at = new Date(ticket.exported_at).getTime()
+  if (Number.isNaN(at)) return false
+  return Date.now() - at >= ARCHIVE_DELETE_AFTER_MS
+}
+
+export async function deleteExportedTicketsPastRetention(): Promise<void> {
+  const cutoff = new Date(Date.now() - ARCHIVE_DELETE_AFTER_MS).toISOString()
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('id, exported_at')
+    .eq('archived', true)
+    .not('exported_at', 'is', null)
+    .lte('exported_at', cutoff)
+
+  if (error || !data) return
+
+  for (const ticket of data) {
+    if (!isReadyForExportCleanup(ticket)) continue
+    await deleteTicketCompletely(ticket.id)
+  }
 }
 
 export function isoToDateInput(iso: string | null): string {

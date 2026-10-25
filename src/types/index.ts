@@ -29,6 +29,7 @@ export type Ticket = {
   created_at: string
   updated_at: string
   archived_at: string | null
+  exported_at: string | null
   building_id: string | null
   building_label: string | null
   unit_location: string | null
@@ -79,6 +80,7 @@ export type TicketInsert = {
   created_at?: string
   updated_at?: string
   archived_at?: string | null
+  exported_at?: string | null
   building_id?: string | null
   building_label?: string | null
   unit_location?: string | null
@@ -98,6 +100,7 @@ export type TicketUpdate = {
   archived?: boolean
   updated_at?: string
   archived_at?: string | null
+  exported_at?: string | null
   building_id?: string | null
   building_label?: string | null
   unit_location?: string | null

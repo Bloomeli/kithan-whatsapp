@@ -120,7 +120,7 @@ export default async function handler(
 
   const client = new Client(25_000)
   let uploaded = 0
-  let folderName = baseFolderName
+  let folderName: string
 
   try {
     await client.access({
@@ -140,7 +140,9 @@ export default async function handler(
     for (const [index, message] of ((messages ?? []) as MessageRow[]).entries()) {
       if (!message.media_url) continue
       const file = await downloadMedia(message.media_url)
-      if (!file) continue
+      if (!file) {
+        throw new Error('Ein Foto oder Video konnte nicht vollständig übertragen werden.')
+      }
       const fileName = mediaFileName(message.media_url, ticket as TicketRow, index + 1, file.extension)
       await client.uploadFrom(Readable.from(file.bytes), fileName)
       uploaded += 1
@@ -155,8 +157,23 @@ export default async function handler(
     return
   }
 
+  const exportedAt = new Date().toISOString()
+  const { error: stampError } = await supabase
+    .from('tickets')
+    .update({ exported_at: exportedAt })
+    .eq('id', ticketId)
+
   client.close()
-  res.status(200).json({ ok: true, folder: folderName, files: uploaded })
+
+  if (stampError) {
+    res.status(500).json({
+      ok: false,
+      error: 'Upload geklappt, aber der Zeitpunkt konnte nicht gespeichert werden.',
+    })
+    return
+  }
+
+  res.status(200).json({ ok: true, folder: folderName, files: uploaded, exported_at: exportedAt })
 }
 
 function buildReport(
@@ -212,7 +229,7 @@ async function unusedFolderName(client: Client, base: string, wanted: string) {
 
 function mediaFileName(url: string, ticket: TicketRow, sequence: number, extension: string) {
   const fromUrl = url.split('/').pop()?.split('?')[0] ?? ''
-  const cleaned = fromUrl.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+  const cleaned = stripUnsafeName(fromUrl)
   if (cleaned && cleaned !== '.' && cleaned !== '..') return cleaned.slice(0, 120)
   const n = String(sequence).padStart(3, '0')
   return `${safeSegment(ticket.title)}_${n}.${extension}`
@@ -248,15 +265,22 @@ function safeSegment(value: string) {
     .replace(/Ü/g, 'Ue')
     .replace(/ß/g, 'ss')
   return (
-    transliterated
-      .replace(/[<>:"/\\|?*]/g, '')
-      .replace(/[\u0000-\u001f]/g, '')
+    stripUnsafeName(transliterated)
       .replace(/\s+/g, '-')
       .replace(/[^A-Za-z0-9._-]/g, '')
       .replace(/-+/g, '-')
       .replace(/^[.-]+|[.-]+$/g, '')
       .slice(0, 48) || 'Meldung'
   )
+}
+
+function stripUnsafeName(value: string) {
+  return [...value]
+    .filter((char) => {
+      const code = char.charCodeAt(0)
+      return code >= 32 && !'<>:"/\\|?*'.includes(char)
+    })
+    .join('')
 }
 
 function joinFtpPath(base: string, child: string) {
