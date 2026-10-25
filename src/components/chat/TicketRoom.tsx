@@ -4,6 +4,7 @@ import { notifyTicketMembers } from '../../lib/push'
 import { bindRealtimeCatchUp } from '../../lib/realtime'
 import { supabase } from '../../lib/supabase'
 import { addInsuranceHandlers } from '../../lib/staff'
+import { exportTicketToCompanyServer } from '../../lib/companyExport'
 import { deleteTicketCompletely, ensureTicketMembership, fetchAccessibleTicket } from '../../lib/tickets'
 import { markTicketRead } from '../../lib/unread'
 import type {
@@ -304,6 +305,29 @@ export function TicketRoom({
     }
 
     onTicketUpdated(data)
+    await uploadClosedTicket(ticket.id)
+  }
+
+  async function handleCompanyExport() {
+    await uploadClosedTicket(ticket.id)
+  }
+
+  async function uploadClosedTicket(ticketId: string) {
+    setActionBusy(true)
+    setError(null)
+    setStatusText('Wird auf den Firmenserver gelegt…')
+    const exported = await exportTicketToCompanyServer(ticketId)
+    setStatusText(null)
+    setActionBusy(false)
+
+    if (!exported.ok) {
+      setError(
+        exported.error ??
+          'Abgeschlossen, aber der Upload auf den Firmenserver ist fehlgeschlagen.',
+      )
+      return
+    }
+
     onBack()
   }
 
@@ -454,12 +478,14 @@ export function TicketRoom({
             insuranceDamage={Boolean(ticket.insurance_damage)}
             situation={situationDraft}
             archived={ticket.archived}
+            disabled={actionBusy}
             onStatusChange={(next) => void handleStatusChange(next)}
             onPriorityChange={(next) => void handlePriorityChange(next)}
             onInsuranceChange={(next) => void handleInsuranceChange(next)}
             onSituationChange={setSituationDraft}
             onSituationBlur={() => void handleSituationSave()}
             onArchive={() => setConfirmArchive(true)}
+            onExport={ticket.archived ? () => void handleCompanyExport() : undefined}
             onDelete={ticket.archived ? () => setConfirmDelete(true) : undefined}
           />
           <TicketIncidentSummary ticket={ticket} />
@@ -524,7 +550,7 @@ export function TicketRoom({
       {confirmArchive ? (
         <ConfirmDialog
           title="Problem abschließen"
-          message="Wollen Sie den Problemraum wirklich abschließen?"
+          message="Der Problemraum wird abgeschlossen. Meldung, Fotos und Videos werden auf den Firmenserver gelegt."
           confirmLabel="Abschließen"
           busy={actionBusy}
           onCancel={() => setConfirmArchive(false)}

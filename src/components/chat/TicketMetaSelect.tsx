@@ -33,6 +33,7 @@ interface TicketMetaSelectProps {
   onSituationChange: (value: string) => void
   onSituationBlur: () => void
   onArchive?: () => void
+  onExport?: () => void
   onDelete?: () => void
 }
 
@@ -49,6 +50,7 @@ export function TicketMetaSelect({
   onSituationChange,
   onSituationBlur,
   onArchive,
+  onExport,
   onDelete,
 }: TicketMetaSelectProps) {
   const statusOptions = TICKET_STATUSES.includes(status)
@@ -116,6 +118,17 @@ export function TicketMetaSelect({
           </button>
         ) : null}
       </div>
+
+      {onExport && archived ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onExport}
+          className="h-11 w-full rounded-xl border border-primary/50 bg-primary/10 text-sm font-semibold text-primary disabled:opacity-40"
+        >
+          Auf Firmenserver legen
+        </button>
+      ) : null}
 
       <label className="flex flex-col gap-0.5">
         <span className="text-[11px] font-medium text-neutral-400">Situation</span>
