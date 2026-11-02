@@ -1,6 +1,12 @@
 export async function exportTicketToCompanyServer(
   ticketId: string,
-): Promise<{ ok: boolean; folder?: string; files?: number; error?: string }> {
+): Promise<{
+  ok: boolean
+  folder?: string
+  files?: number
+  exported_at?: string
+  error?: string
+}> {
   const response = await fetch(
     `/api/archive-export?ticketId=${encodeURIComponent(ticketId)}`,
     {
@@ -14,6 +20,7 @@ export async function exportTicketToCompanyServer(
     ok?: boolean
     folder?: string
     files?: number
+    exported_at?: string
     error?: string
   } | null
 
@@ -28,5 +35,6 @@ export async function exportTicketToCompanyServer(
     ok: true,
     folder: payload.folder,
     files: payload.files,
+    exported_at: payload.exported_at,
   }
 }

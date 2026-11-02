@@ -1,15 +1,20 @@
 import { Readable } from 'node:stream'
 import { Client } from 'basic-ftp'
-import { createClient } from '@supabase/supabase-js'
 
 export const maxDuration = 60
 
-const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(
-  /\/$/,
-  '',
-)
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
+const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '')
+  .trim()
+  .replace(/\/$/, '')
+const SUPABASE_ANON_KEY = (
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  ''
+).trim()
+const TICKET_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const TICKET_SELECT =
+  'id,title,remarks,priority,status,building_label,unit_location,tenant_name,occurred_at,reported_by,insurance_damage,situation,contact,created_at,archived_at'
 
 const FTPS_HOST = (process.env.COMPANY_FTPS_HOST || '').trim()
 const FTPS_PORT = Number(process.env.COMPANY_FTPS_PORT || 21)
@@ -91,47 +96,42 @@ export default async function handler(
   }
 
   const ticketId = readTicketId(req)
-  if (!ticketId) {
+  if (!TICKET_ID_RE.test(ticketId)) {
     res.status(400).json({ ok: false, error: 'Ticket fehlt.' })
     return
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  const ticketQuery = supabase
-    .from('tickets')
-    .select(
-      'id, title, remarks, priority, status, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation, contact, created_at, archived_at',
-    )
-    .eq('id', ticketId)
-    .limit(1)
+  const [ticketResult, messageResult, userResult] = await Promise.all([
+    restGet<TicketRow[]>('tickets', {
+      select: TICKET_SELECT,
+      id: `eq.${ticketId}`,
+      limit: '1',
+    }),
+    restGet<MessageRow[]>('messages', {
+      select: 'user_id,content,media_url,media_type,created_at',
+      ticket_id: `eq.${ticketId}`,
+      order: 'created_at.asc',
+    }),
+    restGet<{ id: string; name: string }[]>('users', { select: 'id,name' }),
+  ])
 
-  const [{ data: ticketRows, error: ticketError }, { data: messages }, { data: users }] =
-    await Promise.all([
-      ticketQuery,
-      supabase
-        .from('messages')
-        .select('user_id, content, media_url, media_type, created_at')
-        .eq('ticket_id', ticketId)
-        .order('created_at', { ascending: true }),
-      supabase.from('users').select('id, name'),
-    ])
-
-  const ticket = ticketRows?.[0]
-  if (ticketError) {
+  if (ticketResult.error) {
     res.status(500).json({
       ok: false,
-      error: `Problemraum konnte nicht geladen werden. ${ticketError.message}`,
+      error: `Problemraum konnte nicht geladen werden. ${ticketResult.error}`,
     })
     return
   }
+  const ticket = ticketResult.data?.[0]
   if (!ticket) {
     res.status(404).json({ ok: false, error: 'Problemraum wurde nicht gefunden.' })
     return
   }
 
-  const names = new Map((users ?? []).map((user) => [user.id, user.name]))
-  const report = buildReport(ticket as TicketRow, (messages ?? []) as MessageRow[], names)
-  const baseFolderName = ticketFolderName(ticket as TicketRow)
+  const messages = messageResult.data ?? []
+  const names = new Map((userResult.data ?? []).map((user) => [user.id, user.name]))
+  const report = buildReport(ticket, messages, names)
+  const baseFolderName = ticketFolderName(ticket)
 
   const client = new Client(25_000)
   let uploaded = 0
@@ -146,19 +146,19 @@ export default async function handler(
       secure: true,
       secureOptions: { rejectUnauthorized: false },
     })
-    folderName = await unusedFolderName(client, FTPS_FOLDER, baseFolderName)
-    const remoteDir = joinFtpPath(FTPS_FOLDER, folderName)
-    await client.ensureDir(remoteDir)
+    await enterFtpDir(client, FTPS_FOLDER)
+    folderName = await unusedFolderName(client, baseFolderName)
+    await client.ensureDir(`${FTPS_FOLDER.replace(/\/+$/, '')}/${folderName}`)
     await client.uploadFrom(Readable.from(Buffer.from(report, 'utf8')), 'Meldung.txt')
     uploaded += 1
 
-    for (const [index, message] of ((messages ?? []) as MessageRow[]).entries()) {
+    for (const [index, message] of messages.entries()) {
       if (!message.media_url) continue
       const file = await downloadMedia(message.media_url)
       if (!file) {
         throw new Error('Ein Foto oder Video konnte nicht vollständig übertragen werden.')
       }
-      const fileName = mediaFileName(message.media_url, ticket as TicketRow, index + 1, file.extension)
+      const fileName = mediaFileName(message.media_url, ticket, index + 1, file.extension)
       await client.uploadFrom(Readable.from(file.bytes), fileName)
       uploaded += 1
     }
@@ -173,10 +173,11 @@ export default async function handler(
   }
 
   const exportedAt = new Date().toISOString()
-  const { error: stampError } = await supabase
-    .from('tickets')
-    .update({ exported_at: exportedAt })
-    .eq('id', ticketId)
+  const stampError = await restPatch(
+    'tickets',
+    { id: `eq.${ticketId}` },
+    { exported_at: exportedAt },
+  )
 
   client.close()
 
@@ -232,14 +233,21 @@ function ticketFolderName(ticket: TicketRow) {
   return `${date}_${street}_${title}`.slice(0, 80)
 }
 
-async function unusedFolderName(client: Client, base: string, wanted: string) {
-  const existing = new Set((await client.list(base)).map((entry) => entry.name))
+async function unusedFolderName(client: Client, wanted: string) {
+  const existing = new Set((await client.list()).map((entry) => entry.name))
   if (!existing.has(wanted)) return wanted
   for (let index = 2; index < 100; index += 1) {
     const next = `${wanted}_${index}`
     if (!existing.has(next)) return next
   }
   return `${wanted}_${Date.now()}`
+}
+
+async function enterFtpDir(client: Client, path: string) {
+  await client.cd('/')
+  for (const part of path.split('/').filter(Boolean)) {
+    await client.cd(part)
+  }
 }
 
 function mediaFileName(url: string, ticket: TicketRow, sequence: number, extension: string) {
@@ -305,6 +313,9 @@ function readTicketId(req: {
 }) {
   const fromQuery = req.query?.ticketId
   if (typeof fromQuery === 'string' && fromQuery) return fromQuery.trim()
+  if (Array.isArray(fromQuery) && typeof fromQuery[0] === 'string' && fromQuery[0]) {
+    return fromQuery[0].trim()
+  }
 
   if (req.url && req.url.includes('ticketId=')) {
     const search = new URL(req.url, 'https://n.local').searchParams.get('ticketId')
@@ -326,8 +337,70 @@ function readTicketId(req: {
   return ''
 }
 
-function joinFtpPath(base: string, child: string) {
-  return `${base.replace(/\/+$/, '')}/${child.replace(/^\/+/, '')}`
+function restUrl(table: string) {
+  const base = new URL(SUPABASE_URL)
+  const prefix = base.pathname.replace(/\/$/, '')
+  const restBase = prefix.endsWith('/rest/v1') ? prefix : '/rest/v1'
+  return new URL(`${restBase}/${table}`, `${base.origin}/`)
+}
+
+async function restGet<T>(
+  table: string,
+  params: Record<string, string>,
+): Promise<{ data: T | null; error: string | null }> {
+  const url = restUrl(table)
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value)
+  }
+  const response = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      Accept: 'application/json',
+    },
+  })
+  const text = await response.text()
+  if (!response.ok) {
+    return { data: null, error: restErrorMessage(text, response.status) }
+  }
+  try {
+    return { data: JSON.parse(text) as T, error: null }
+  } catch {
+    return { data: null, error: 'Antwort von Supabase war ungültig.' }
+  }
+}
+
+async function restPatch(
+  table: string,
+  filter: Record<string, string>,
+  body: unknown,
+) {
+  const url = restUrl(table)
+  for (const [key, value] of Object.entries(filter)) {
+    url.searchParams.set(key, value)
+  }
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(body),
+  })
+  if (response.ok) return null
+  return restErrorMessage(await response.text(), response.status)
+}
+
+function restErrorMessage(text: string, status: number) {
+  try {
+    const parsed = JSON.parse(text) as { message?: string; error?: string }
+    return parsed.message || parsed.error || `HTTP ${status}`
+  } catch {
+    return text.slice(0, 160) || `HTTP ${status}`
+  }
 }
 
 function formatDate(iso: string) {

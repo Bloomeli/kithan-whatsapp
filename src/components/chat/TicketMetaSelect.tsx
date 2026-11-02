@@ -26,6 +26,7 @@ interface TicketMetaSelectProps {
   insuranceDamage: boolean
   situation: string
   archived?: boolean
+  exported?: boolean
   disabled?: boolean
   onStatusChange: (status: TicketStatus) => void
   onPriorityChange: (priority: TicketPriority) => void
@@ -43,6 +44,7 @@ export function TicketMetaSelect({
   insuranceDamage,
   situation,
   archived = false,
+  exported = false,
   disabled = false,
   onStatusChange,
   onPriorityChange,
@@ -107,7 +109,7 @@ export function TicketMetaSelect({
           </button>
         ) : null}
 
-        {onDelete && archived ? (
+        {onDelete && archived && exported ? (
           <button
             type="button"
             disabled={disabled}
@@ -119,7 +121,7 @@ export function TicketMetaSelect({
         ) : null}
       </div>
 
-      {onExport && archived ? (
+      {onExport && archived && !exported ? (
         <button
           type="button"
           disabled={disabled}

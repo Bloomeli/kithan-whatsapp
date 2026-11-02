@@ -285,6 +285,7 @@ export function TicketRoom({
 
   async function handleArchive() {
     setActionBusy(true)
+    setError(null)
     const archivedAt = new Date().toISOString()
     let { data, error: updateError } = await supabase
       .from('tickets')
@@ -312,23 +313,22 @@ export function TicketRoom({
       updateError = retry.error
     }
 
-    setActionBusy(false)
     setConfirmArchive(false)
 
     if (updateError || !data) {
+      setActionBusy(false)
       setError('Abschließen ist fehlgeschlagen.')
       return
     }
 
-    onTicketUpdated(data)
-    await uploadClosedTicket(ticket.id)
+    await uploadClosedTicket(ticket.id, data)
   }
 
   async function handleCompanyExport() {
     await uploadClosedTicket(ticket.id)
   }
 
-  async function uploadClosedTicket(ticketId: string) {
+  async function uploadClosedTicket(ticketId: string, archivedTicket?: Ticket) {
     setActionBusy(true)
     setError(null)
     setStatusText('Wird auf den Firmenserver gelegt…')
@@ -337,6 +337,7 @@ export function TicketRoom({
     setActionBusy(false)
 
     if (!exported.ok) {
+      if (archivedTicket) onTicketUpdated(archivedTicket)
       setError(
         exported.error ??
           'Abgeschlossen, aber der Upload auf den Firmenserver ist fehlgeschlagen.',
@@ -344,6 +345,11 @@ export function TicketRoom({
       return
     }
 
+    onTicketUpdated({
+      ...(archivedTicket ?? ticket),
+      archived: true,
+      exported_at: exported.exported_at ?? new Date().toISOString(),
+    })
     onBack()
   }
 
@@ -494,6 +500,7 @@ export function TicketRoom({
             insuranceDamage={Boolean(ticket.insurance_damage)}
             situation={situationDraft}
             archived={ticket.archived}
+            exported={Boolean(ticket.exported_at)}
             disabled={actionBusy}
             onStatusChange={(next) => void handleStatusChange(next)}
             onPriorityChange={(next) => void handlePriorityChange(next)}
