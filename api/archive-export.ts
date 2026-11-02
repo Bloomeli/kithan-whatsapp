@@ -34,6 +34,7 @@ const STATUS_LABELS: Record<string, string> = {
   waiting_for_tenant: 'Warten auf Mieter',
   waiting_for_parts: 'Warten auf Teile',
   done: 'Wird erledigt',
+  completed: 'Erledigt',
 }
 
 type TicketRow = {
@@ -63,7 +64,12 @@ type MessageRow = {
 }
 
 export default async function handler(
-  req: { method?: string; body?: unknown },
+  req: {
+    method?: string
+    body?: unknown
+    url?: string
+    query?: Record<string, string | string[] | undefined>
+  },
   res: { status: (code: number) => { json: (body: unknown) => void } },
 ) {
   if (req.method !== 'POST') {
@@ -84,23 +90,24 @@ export default async function handler(
     return
   }
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-  const ticketId = String(body?.ticketId ?? '')
+  const ticketId = readTicketId(req)
   if (!ticketId) {
     res.status(400).json({ ok: false, error: 'Ticket fehlt.' })
     return
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  const [{ data: ticket, error: ticketError }, { data: messages }, { data: users }] =
+  const ticketQuery = supabase
+    .from('tickets')
+    .select(
+      'id, title, remarks, priority, status, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation, contact, created_at, archived_at',
+    )
+    .eq('id', ticketId)
+    .limit(1)
+
+  const [{ data: ticketRows, error: ticketError }, { data: messages }, { data: users }] =
     await Promise.all([
-      supabase
-        .from('tickets')
-        .select(
-          'id, title, remarks, priority, status, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation, contact, created_at, archived_at',
-        )
-        .eq('id', ticketId)
-        .maybeSingle(),
+      ticketQuery,
       supabase
         .from('messages')
         .select('user_id, content, media_url, media_type, created_at')
@@ -109,7 +116,15 @@ export default async function handler(
       supabase.from('users').select('id, name'),
     ])
 
-  if (ticketError || !ticket) {
+  const ticket = ticketRows?.[0]
+  if (ticketError) {
+    res.status(500).json({
+      ok: false,
+      error: `Problemraum konnte nicht geladen werden. ${ticketError.message}`,
+    })
+    return
+  }
+  if (!ticket) {
     res.status(404).json({ ok: false, error: 'Problemraum wurde nicht gefunden.' })
     return
   }
@@ -281,6 +296,34 @@ function stripUnsafeName(value: string) {
       return code >= 32 && !'<>:"/\\|?*'.includes(char)
     })
     .join('')
+}
+
+function readTicketId(req: {
+  body?: unknown
+  url?: string
+  query?: Record<string, string | string[] | undefined>
+}) {
+  const fromQuery = req.query?.ticketId
+  if (typeof fromQuery === 'string' && fromQuery) return fromQuery.trim()
+
+  if (req.url && req.url.includes('ticketId=')) {
+    const search = new URL(req.url, 'https://n.local').searchParams.get('ticketId')
+    if (search) return search.trim()
+  }
+
+  let body = req.body
+  if (typeof body === 'string' && body) {
+    try {
+      body = JSON.parse(body) as unknown
+    } catch {
+      body = null
+    }
+  }
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    const value = (body as { ticketId?: unknown }).ticketId
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
 }
 
 function joinFtpPath(base: string, child: string) {

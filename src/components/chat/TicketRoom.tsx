@@ -285,16 +285,32 @@ export function TicketRoom({
 
   async function handleArchive() {
     setActionBusy(true)
-    const { data, error: updateError } = await supabase
+    const archivedAt = new Date().toISOString()
+    let { data, error: updateError } = await supabase
       .from('tickets')
       .update({
         archived: true,
-        status: ['done'],
-        archived_at: new Date().toISOString(),
+        status: ['completed'],
+        archived_at: archivedAt,
       })
       .eq('id', ticket.id)
       .select()
       .single()
+
+    if (updateError) {
+      const retry = await supabase
+        .from('tickets')
+        .update({
+          archived: true,
+          status: ['done'],
+          archived_at: archivedAt,
+        })
+        .eq('id', ticket.id)
+        .select()
+        .single()
+      data = retry.data
+      updateError = retry.error
+    }
 
     setActionBusy(false)
     setConfirmArchive(false)
@@ -420,7 +436,7 @@ export function TicketRoom({
   }
 
   return (
-    <div className="flex h-svh w-full min-w-0 flex-col bg-black text-white">
+    <div className="flex h-svh w-full min-w-0 flex-col overflow-x-hidden overscroll-none bg-black text-white">
       <div className="min-h-0 min-w-0 w-full flex-1 overflow-y-auto">
         <header className="sticky top-0 z-10 w-full min-w-0 border-b border-neutral-800 bg-neutral-950 px-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
           <div className="flex w-full min-w-0 items-center gap-1">

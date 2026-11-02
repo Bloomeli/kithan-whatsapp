@@ -1,6 +1,6 @@
 import type { TicketStatus, TicketPriority } from '../types'
 
-/** 7 Arbeits-Status. Archiv ist kein Enum-Wert, sondern tickets.archived. */
+/** Arbeits-Status. Archiv ist kein Enum-Wert, sondern tickets.archived. */
 export const TICKET_STATUSES: TicketStatus[] = [
   'open',
   'under_review',
@@ -9,6 +9,7 @@ export const TICKET_STATUSES: TicketStatus[] = [
   'waiting_for_tenant',
   'waiting_for_parts',
   'done',
+  'completed',
 ]
 
 export const TICKET_PRIORITIES: TicketPriority[] = [
@@ -26,6 +27,7 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   waiting_for_tenant: 'Warten auf Mieter',
   waiting_for_parts: 'Warten auf Teile',
   done: 'Wird erledigt',
+  completed: 'Erledigt',
 }
 
 export const PRIORITY_LABELS: Record<TicketPriority, string> = {

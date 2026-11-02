@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import type { User } from '../../types'
 
@@ -22,6 +23,14 @@ export function AddMembersModal({
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const memberSet = new Set(memberIds)
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -68,57 +77,62 @@ export function AddMembersModal({
     onAdded(user)
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
-      <div
-        role="dialog"
-        aria-labelledby="add-members-title"
-        className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-950 p-4 text-white shadow-xl"
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 id="add-members-title" className="text-base font-semibold">
-            Kollegen hinzufügen
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-sm text-neutral-400 hover:text-white"
-          >
-            Schließen
-          </button>
+  const dialog = (
+    <div className="fixed inset-0 z-[80] overflow-hidden overscroll-none bg-black/70">
+      <div className="flex h-full w-full max-w-full items-end justify-center p-4 sm:items-center">
+        <div
+          role="dialog"
+          aria-labelledby="add-members-title"
+          className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-950 p-4 text-white shadow-xl"
+        >
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 id="add-members-title" className="text-base font-semibold">
+              Kollegen hinzufügen
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-sm text-neutral-400 hover:text-white"
+            >
+              Schließen
+            </button>
+          </div>
+
+          {loading ? (
+            <p className="py-6 text-center text-sm text-neutral-400">Lade Liste…</p>
+          ) : null}
+
+          {error ? (
+            <p className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+              {error}
+            </p>
+          ) : null}
+
+          <ul className="max-h-72 overflow-y-auto overscroll-contain">
+            {users.map((user) => {
+              const already = memberSet.has(user.id)
+              return (
+                <li key={user.id} className="border-b border-neutral-800 last:border-b-0">
+                  <button
+                    type="button"
+                    disabled={already || savingId === user.id}
+                    onClick={() => void addMember(user)}
+                    className="flex w-full items-center justify-between px-1 py-3 text-left disabled:opacity-40"
+                  >
+                    <span className="text-sm font-medium">{user.name}</span>
+                    <span className="text-xl font-light leading-none text-primary">
+                      {already ? '✓' : savingId === user.id ? '…' : '+'}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
         </div>
-
-        {loading ? (
-          <p className="py-6 text-center text-sm text-neutral-400">Lade Liste…</p>
-        ) : null}
-
-        {error ? (
-          <p className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-            {error}
-          </p>
-        ) : null}
-
-        <ul className="max-h-72 overflow-y-auto">
-          {users.map((user) => {
-            const already = memberSet.has(user.id)
-            return (
-              <li key={user.id} className="border-b border-neutral-800 last:border-b-0">
-                <button
-                  type="button"
-                  disabled={already || savingId === user.id}
-                  onClick={() => void addMember(user)}
-                  className="flex w-full items-center justify-between px-1 py-3 text-left disabled:opacity-40"
-                >
-                  <span className="text-sm font-medium">{user.name}</span>
-                  <span className="text-xl font-light leading-none text-primary">
-                    {already ? '✓' : savingId === user.id ? '…' : '+'}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return dialog
+  return createPortal(dialog, document.body)
 }

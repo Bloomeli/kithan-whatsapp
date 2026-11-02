@@ -18,7 +18,8 @@ create type public.ticket_status as enum (
   'waiting',
   'waiting_for_tenant',
   'waiting_for_parts',
-  'done'
+  'done',
+  'completed'
 );
 
 -- ---------------------------------------------------------------------------

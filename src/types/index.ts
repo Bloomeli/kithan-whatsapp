@@ -9,6 +9,7 @@ export type TicketStatus =
   | 'waiting_for_tenant'
   | 'waiting_for_parts'
   | 'done'
+  | 'completed'
 
 export type MediaType = 'image' | 'video'
 
