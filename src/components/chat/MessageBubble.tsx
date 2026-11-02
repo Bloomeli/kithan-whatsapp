@@ -84,14 +84,14 @@ function ImagePreview({ url }: { url: string }) {
         <img
           src={url}
           alt="Foto"
-          className="max-h-64 w-full max-w-full object-cover"
+          className="h-auto max-h-64 w-full max-w-full object-cover"
         />
       </button>
       {open ? (
         <div
           role="dialog"
           aria-label="Foto"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden overscroll-none bg-black/90 p-4 [touch-action:none]"
           onClick={() => setOpen(false)}
         >
           <img

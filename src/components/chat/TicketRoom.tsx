@@ -442,11 +442,10 @@ export function TicketRoom({
   }
 
   return (
-    <div className="flex h-svh w-full min-w-0 flex-col overflow-hidden overscroll-none bg-black text-white">
+    <div className="flex h-svh w-full min-w-0 flex-col overflow-hidden overscroll-none bg-black text-white [touch-action:pan-y]">
       <div
-        className={`min-h-0 min-w-0 w-full flex-1 overscroll-none ${
-          addOpen ? 'overflow-hidden' : 'overflow-y-auto'
-        }`}
+        data-chat-scroll
+        className="min-h-0 min-w-0 w-full flex-1 overflow-x-clip overflow-y-auto overscroll-none [touch-action:pan-y]"
       >
         <header className="sticky top-0 z-10 w-full min-w-0 border-b border-neutral-800 bg-neutral-950 px-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
           <div className="flex w-full min-w-0 items-center gap-1">
