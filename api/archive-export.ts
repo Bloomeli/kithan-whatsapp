@@ -69,6 +69,15 @@ type MessageRow = {
   created_at: string
 }
 
+type ExportedMedia = {
+  bytes: Buffer
+  extension: string
+  fileName: string
+  kind: 'image' | 'video'
+  createdAt: string
+  caption: string
+}
+
 export default async function handler(
   req: {
     method?: string
@@ -131,7 +140,31 @@ export default async function handler(
 
   const messages = messageResult.data ?? []
   const names = new Map((userResult.data ?? []).map((user) => [user.id, user.name]))
-  const reportPdf = await buildReportPdf(ticket, messages, names)
+  const media: ExportedMedia[] = []
+  for (const [index, message] of messages.entries()) {
+    if (!message.media_url) continue
+    const file = await downloadMedia(message.media_url)
+    if (!file) {
+      res.status(502).json({
+        ok: false,
+        error: 'Ein Foto oder Video konnte nicht vollständig übertragen werden.',
+      })
+      return
+    }
+    media.push({
+      bytes: file.bytes,
+      extension: file.extension,
+      fileName: mediaFileName(message.media_url, ticket, index + 1, file.extension),
+      kind:
+        message.media_type === 'video' || file.extension === 'mp4' || file.extension === 'webm'
+          ? 'video'
+          : 'image',
+      createdAt: message.created_at,
+      caption: message.content.trim(),
+    })
+  }
+
+  const reportPdf = await buildReportPdf(ticket, messages, names, media)
   const baseFolderName = ticketFolderName(ticket)
 
   const client = new Client(25_000)
@@ -153,14 +186,10 @@ export default async function handler(
     await client.uploadFrom(Readable.from(reportPdf), 'Meldung.pdf')
     uploaded += 1
 
-    for (const [index, message] of messages.entries()) {
-      if (!message.media_url) continue
-      const file = await downloadMedia(message.media_url)
-      if (!file) {
-        throw new Error('Ein Foto oder Video konnte nicht vollständig übertragen werden.')
-      }
-      const fileName = mediaFileName(message.media_url, ticket, index + 1, file.extension)
-      await client.uploadFrom(Readable.from(file.bytes), fileName)
+    const photos = media.filter((entry) => entry.kind === 'image')
+    const videos = media.filter((entry) => entry.kind === 'video')
+    for (const file of [...photos, ...videos]) {
+      await client.uploadFrom(Readable.from(file.bytes), file.fileName)
       uploaded += 1
     }
   } catch (error) {
@@ -197,6 +226,7 @@ async function buildReportPdf(
   ticket: TicketRow,
   messages: MessageRow[],
   names: Map<string, string>,
+  media: ExportedMedia[],
 ) {
   const status = (ticket.status ?? [])
     .map((entry) => STATUS_LABELS[entry] ?? entry)
@@ -205,36 +235,264 @@ async function buildReportPdf(
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
   const pageSize: [number, number] = [595.28, 841.89]
-  const margin = 50
-  const maxWidth = pageSize[0] - margin * 2
+  const margin = 40
+  const boxWidth = pageSize[0] - margin * 2
+  const footer = 34
+  const ink = rgb(0.1, 0.1, 0.1)
+  const muted = rgb(0.32, 0.32, 0.32)
+  const line = rgb(0.78, 0.78, 0.78)
+  const headerFill = rgb(0.12, 0.12, 0.12)
+  const boxFill = rgb(1, 1, 1)
   let page = doc.addPage(pageSize)
-  let y = pageSize[1] - margin
+  let y = pageSize[1] - 32
 
-  const ensureSpace = (needed: number) => {
-    if (y - needed >= margin) return
+  const addPage = () => {
     page = doc.addPage(pageSize)
-    y = pageSize[1] - margin
+    y = pageSize[1] - 32
   }
 
-  const write = (text: string, used: PDFFont, size: number, extraGap = 4) => {
-    const lines = wrapPdfText(pdfSafe(text), used, size, maxWidth)
-    for (const line of lines) {
-      ensureSpace(size + extraGap)
-      page.drawText(line, {
-        x: margin,
-        y: y - size,
-        size,
-        font: used,
-        color: rgb(0.12, 0.12, 0.12),
+  const ensure = (needed: number) => {
+    if (y - needed < footer) addPage()
+  }
+
+  const drawBoxFrame = (top: number, height: number) => {
+    page.drawRectangle({
+      x: margin,
+      y: top - height,
+      width: boxWidth,
+      height,
+      borderColor: ink,
+      borderWidth: 1.2,
+      color: boxFill,
+    })
+  }
+
+  const drawBoxTitle = (top: number, title: string) => {
+    page.drawRectangle({
+      x: margin,
+      y: top - 26,
+      width: boxWidth,
+      height: 26,
+      color: headerFill,
+    })
+    page.drawText(pdfSafe(title), {
+      x: margin + 10,
+      y: top - 18,
+      size: 11,
+      font: fontBold,
+      color: rgb(1, 1, 1),
+    })
+  }
+
+  const drawHeader = () => {
+    const height = 58
+    ensure(height + 12)
+    const top = y
+    drawBoxFrame(top, height)
+    page.drawRectangle({
+      x: margin,
+      y: top - height,
+      width: 8,
+      height,
+      color: rgb(0.1, 0.42, 1),
+    })
+    page.drawText('Kithan Problemraum', {
+      x: margin + 20,
+      y: top - 22,
+      size: 10,
+      font: fontBold,
+      color: muted,
+    })
+    const titleLines = wrapPdfText(pdfSafe(ticket.title || 'Meldung'), fontBold, 16, boxWidth - 36)
+    page.drawText(titleLines[0] ?? 'Meldung', {
+      x: margin + 20,
+      y: top - 44,
+      size: 16,
+      font: fontBold,
+      color: ink,
+    })
+    y = top - height - 14
+  }
+
+  const drawFieldBox = (title: string, rows: Array<[string, string]>) => {
+    const labelWidth = 148
+    const valueWidth = boxWidth - labelWidth - 28
+    const prepared = rows.map(([label, value]) => ({
+      label: pdfSafe(label),
+      lines: wrapPdfText(pdfSafe(value || '-'), font, 11, valueWidth),
+    }))
+    const body = prepared.reduce((sum, row) => sum + Math.max(20, row.lines.length * 14) + 8, 0)
+    const height = 26 + body + 10
+    ensure(Math.min(height, 240))
+    if (y - height < footer) addPage()
+    const top = y
+    drawBoxFrame(top, height)
+    drawBoxTitle(top, title)
+    let cursor = top - 36
+    for (const [index, row] of prepared.entries()) {
+      const rowHeight = Math.max(20, row.lines.length * 14)
+      if (index > 0) {
+        page.drawLine({
+          start: { x: margin + 10, y: cursor + 6 },
+          end: { x: margin + boxWidth - 10, y: cursor + 6 },
+          thickness: 0.6,
+          color: line,
+        })
+      }
+      page.drawText(row.label, {
+        x: margin + 12,
+        y: cursor - 12,
+        size: 9,
+        font: fontBold,
+        color: muted,
       })
-      y -= size + extraGap
+      for (const [lineIndex, text] of row.lines.entries()) {
+        page.drawText(text, {
+          x: margin + 12 + labelWidth,
+          y: cursor - 12 - lineIndex * 14,
+          size: 11,
+          font,
+          color: ink,
+        })
+      }
+      cursor -= rowHeight + 8
+    }
+    y = top - height - 12
+  }
+
+  const drawTextBox = (title: string, paragraphs: string[]) => {
+    const innerWidth = boxWidth - 24
+    const lines = paragraphs.flatMap((paragraph) =>
+      wrapPdfText(pdfSafe(paragraph || '-'), font, 11, innerWidth),
+    )
+    const chunks: string[][] = []
+    let current: string[] = []
+    let used = 0
+    const pushChunk = () => {
+      if (current.length === 0) return
+      chunks.push(current)
+      current = []
+      used = 0
+    }
+    for (const text of lines) {
+      const lineH = 15
+      const available = y - footer - 40
+      const limit = chunks.length === 0 && current.length === 0
+        ? Math.max(80, available)
+        : pageSize[1] - 32 - footer - 40
+      if (used + lineH > limit && current.length > 0) pushChunk()
+      current.push(text)
+      used += lineH
+    }
+    pushChunk()
+    if (chunks.length === 0) chunks.push(['-'])
+
+    for (const [chunkIndex, chunk] of chunks.entries()) {
+      const height = 26 + chunk.length * 15 + 16
+      ensure(height)
+      const top = y
+      drawBoxFrame(top, height)
+      drawBoxTitle(top, chunkIndex === 0 ? title : `${title} (Fortsetzung)`)
+      let cursor = top - 42
+      for (const text of chunk) {
+        page.drawText(text, {
+          x: margin + 12,
+          y: cursor,
+          size: 11,
+          font,
+          color: ink,
+        })
+        cursor -= 15
+      }
+      y = top - height - 12
     }
   }
 
-  write('Kithan Problemraum', fontBold, 16, 8)
-  write(ticket.title || 'Meldung', fontBold, 13, 14)
+  const drawMediaBox = async (entry: ExportedMedia, index: number) => {
+    const heading = entry.kind === 'video' ? `Video ${index}` : `Foto ${index}`
+    const caption = entry.caption || (entry.kind === 'video' ? entry.fileName : formatDate(entry.createdAt))
+    const captionLines = wrapPdfText(
+      pdfSafe(`${formatDate(entry.createdAt)}  ${caption}`),
+      font,
+      10,
+      boxWidth - 24,
+    )
 
-  const fields: Array<[string, string]> = [
+    if (entry.kind === 'video') {
+      const height = 26 + 48 + captionLines.length * 13
+      ensure(height)
+      const top = y
+      drawBoxFrame(top, height)
+      drawBoxTitle(top, heading)
+      page.drawText(pdfSafe(entry.fileName), {
+        x: margin + 12,
+        y: top - 44,
+        size: 11,
+        font: fontBold,
+        color: ink,
+      })
+      page.drawText('Videodatei liegt im gleichen Ordner.', {
+        x: margin + 12,
+        y: top - 60,
+        size: 10,
+        font,
+        color: muted,
+      })
+      y = top - height - 12
+      return
+    }
+
+    const image = await embedPdfImage(doc, entry.bytes, entry.extension)
+    if (!image) {
+      const height = 26 + 40 + captionLines.length * 13
+      ensure(height)
+      const top = y
+      drawBoxFrame(top, height)
+      drawBoxTitle(top, heading)
+      page.drawText('Foto liegt als Datei im gleichen Ordner.', {
+        x: margin + 12,
+        y: top - 46,
+        size: 11,
+        font,
+        color: muted,
+      })
+      y = top - height - 12
+      return
+    }
+
+    const maxW = boxWidth - 24
+    const maxH = 320
+    const scale = Math.min(maxW / image.width, maxH / image.height, 1)
+    const drawW = image.width * scale
+    const drawH = image.height * scale
+    const height = 26 + 16 + drawH + captionLines.length * 13 + 14
+    ensure(Math.min(height, 200))
+    if (y - height < footer) addPage()
+    const top = y
+    drawBoxFrame(top, height)
+    drawBoxTitle(top, heading)
+    page.drawImage(image, {
+      x: margin + 12,
+      y: top - 26 - 10 - drawH,
+      width: drawW,
+      height: drawH,
+    })
+    let cursor = top - 26 - 16 - drawH - 12
+    for (const text of captionLines) {
+      page.drawText(text, {
+        x: margin + 12,
+        y: cursor,
+        size: 10,
+        font,
+        color: muted,
+      })
+      cursor -= 13
+    }
+    y = top - height - 12
+  }
+
+  drawHeader()
+  drawFieldBox('Meldung', [
     ['Gebäude', ticket.building_label || '-'],
     ['Bereich', ticket.unit_location || '-'],
     ['Dringlichkeit', PRIORITY_LABELS[ticket.priority] ?? ticket.priority],
@@ -244,41 +502,75 @@ async function buildReportPdf(
     ['Gemeldet von', ticket.reported_by || '-'],
     ['Datum', formatDate(ticket.occurred_at || ticket.created_at)],
     ['Versicherungsschaden', ticket.insurance_damage ? 'Ja' : 'Nein'],
-    ['Situation', ticket.situation || '-'],
     ['Sonstiges', ticket.remarks || '-'],
-  ]
+  ])
+  drawTextBox('Situation', [ticket.situation || 'Keine Angabe'])
 
-  for (const [label, value] of fields) {
-    write(`${label}: ${value}`, font, 11, 5)
-  }
+  const chatLines =
+    messages.length === 0
+      ? ['Keine Nachrichten.']
+      : messages.map((message) => {
+          const author = names.get(message.user_id) || 'Unbekannt'
+          const text =
+            message.content.trim() ||
+            (message.media_type === 'video'
+              ? 'Video (siehe Anhang)'
+              : message.media_type === 'image'
+                ? 'Foto (siehe Anhang)'
+                : 'Nachricht')
+          return `${formatDate(message.created_at)}  ${author}: ${text}`
+        })
+  drawTextBox('Chat', chatLines)
 
-  y -= 8
-  write('Chat', fontBold, 13, 8)
-
-  if (messages.length === 0) {
-    write('Keine Nachrichten.', font, 11, 5)
+  const photos = media.filter((entry) => entry.kind === 'image')
+  const videos = media.filter((entry) => entry.kind === 'video')
+  if (photos.length === 0 && videos.length === 0) {
+    drawTextBox('Fotos und Videos', ['Keine Fotos oder Videos.'])
   } else {
-    for (const message of messages) {
-      const author = names.get(message.user_id) || 'Unbekannt'
-      const text =
-        message.content.trim() ||
-        (message.media_type === 'video' ? 'Video' : message.media_type === 'image' ? 'Foto' : 'Nachricht')
-      write(`${formatDate(message.created_at)}  ${author}: ${text}`, font, 11, 5)
+    let photoIndex = 1
+    for (const entry of photos) {
+      await drawMediaBox(entry, photoIndex)
+      photoIndex += 1
+    }
+    let videoIndex = 1
+    for (const entry of videos) {
+      await drawMediaBox(entry, videoIndex)
+      videoIndex += 1
     }
   }
 
   const pages = doc.getPages()
   pages.forEach((entry: PDFPage, index: number) => {
     entry.drawText(`${index + 1} / ${pages.length}`, {
-      x: pageSize[0] - margin - 40,
-      y: 24,
+      x: pageSize[0] - margin - 36,
+      y: 16,
       size: 9,
       font,
-      color: rgb(0.4, 0.4, 0.4),
+      color: muted,
     })
   })
 
   return Buffer.from(await doc.save())
+}
+
+async function embedPdfImage(doc: PDFDocument, bytes: Buffer, extension: string) {
+  const raw = new Uint8Array(bytes)
+  const tryJpg = async () => {
+    try {
+      return await doc.embedJpg(raw)
+    } catch {
+      return null
+    }
+  }
+  const tryPng = async () => {
+    try {
+      return await doc.embedPng(raw)
+    } catch {
+      return null
+    }
+  }
+  if (extension === 'png') return (await tryPng()) ?? (await tryJpg())
+  return (await tryJpg()) ?? (await tryPng())
 }
 
 function wrapPdfText(text: string, font: PDFFont, size: number, maxWidth: number) {
