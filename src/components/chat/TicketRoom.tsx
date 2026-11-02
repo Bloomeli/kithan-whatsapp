@@ -5,7 +5,12 @@ import { bindRealtimeCatchUp } from '../../lib/realtime'
 import { supabase } from '../../lib/supabase'
 import { addInsuranceHandlers } from '../../lib/staff'
 import { exportTicketToCompanyServer } from '../../lib/companyExport'
-import { deleteTicketCompletely, ensureTicketMembership, fetchAccessibleTicket } from '../../lib/tickets'
+import {
+  deleteTicketCompletely,
+  ensureTicketMembership,
+  EXPORTED_TICKET_DELETE_NOTICE,
+  fetchAccessibleTicket,
+} from '../../lib/tickets'
 import { markTicketRead } from '../../lib/unread'
 import type {
   Message,
@@ -515,6 +520,11 @@ export function TicketRoom({
             onDelete={ticket.archived ? () => setConfirmDelete(true) : undefined}
           />
           <TicketIncidentSummary ticket={ticket} />
+          {ticket.archived && ticket.exported_at ? (
+            <p className="mt-2 rounded-xl border border-archive/40 bg-archive/10 px-3 py-2 text-sm leading-relaxed text-archive">
+              {EXPORTED_TICKET_DELETE_NOTICE}
+            </p>
+          ) : null}
         </div>
 
         {error ? (
@@ -587,7 +597,11 @@ export function TicketRoom({
       {confirmDelete ? (
         <ConfirmDialog
           title="Löschen"
-          message="Wollen Sie wirklich die Datei löschen?"
+          message={
+            ticket.exported_at
+              ? EXPORTED_TICKET_DELETE_NOTICE
+              : 'Wollen Sie wirklich die Datei löschen? Sie liegt noch nicht auf dem Firmenserver.'
+          }
           confirmLabel="Löschen"
           danger
           busy={actionBusy}

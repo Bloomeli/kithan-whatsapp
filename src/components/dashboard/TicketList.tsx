@@ -5,6 +5,7 @@ import {
   ARCHIVE_DELETE_AFTER_DAYS,
   deleteExportedTicketsPastRetention,
   deleteTicketCompletely,
+  EXPORTED_TICKET_DELETE_NOTICE,
   fetchTicketsForMember,
   needsCompanyUploadReminder,
 } from '../../lib/tickets'
@@ -179,7 +180,11 @@ export function TicketList({
       {deleting ? (
         <ConfirmDialog
           title="Löschen"
-          message="Wollen Sie wirklich die Datei löschen?"
+          message={
+            deleting.exported_at
+              ? EXPORTED_TICKET_DELETE_NOTICE
+              : 'Wollen Sie wirklich die Datei löschen? Sie liegt noch nicht auf dem Firmenserver.'
+          }
           confirmLabel="Löschen"
           danger
           busy={deleteBusy}
@@ -279,9 +284,14 @@ function TicketRow({
             <span className="mt-0.5 block truncate text-[13px] text-neutral-400">
               {statusText || 'Kein Status'}
             </span>
-            {overdue ? (
+            {archived && ticket.exported_at ? (
+              <span className="mt-0.5 block text-[12px] font-medium text-archive">
+                Auf Firmenserver · in {ARCHIVE_DELETE_AFTER_DAYS} Tagen automatisch weg
+              </span>
+            ) : null}
+            {archived && !ticket.exported_at ? (
               <span className="mt-0.5 block text-[12px] font-medium text-yellow-300">
-                Bitte hochladen
+                {overdue ? 'Bitte hochladen' : 'Noch nicht auf dem Firmenserver'}
               </span>
             ) : null}
           </span>

@@ -6,6 +6,8 @@ const TICKET_COLUMNS =
   'id, title, remarks, priority, status, archived, created_by, created_at, updated_at, archived_at, exported_at, building_id, building_label, unit_location, tenant_name, occurred_at, reported_by, insurance_damage, situation, contact'
 
 export const ARCHIVE_DELETE_AFTER_DAYS = 14
+export const EXPORTED_TICKET_DELETE_NOTICE =
+  `Dieses Ticket ist auf den Firmenserver hochgeladen. Wollen Sie löschen? In ${ARCHIVE_DELETE_AFTER_DAYS} Tagen wird es automatisch gelöscht.`
 const ARCHIVE_DELETE_AFTER_MS = ARCHIVE_DELETE_AFTER_DAYS * 24 * 60 * 60 * 1000
 
 export async function ensureTicketMembership(ticketId: string, userId: string) {
