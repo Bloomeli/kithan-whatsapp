@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream'
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import { Client } from 'basic-ftp'
 
 export const maxDuration = 60
@@ -130,7 +131,7 @@ export default async function handler(
 
   const messages = messageResult.data ?? []
   const names = new Map((userResult.data ?? []).map((user) => [user.id, user.name]))
-  const report = buildReport(ticket, messages, names)
+  const reportPdf = await buildReportPdf(ticket, messages, names)
   const baseFolderName = ticketFolderName(ticket)
 
   const client = new Client(25_000)
@@ -149,7 +150,7 @@ export default async function handler(
     await enterFtpDir(client, FTPS_FOLDER)
     folderName = await unusedFolderName(client, baseFolderName)
     await client.ensureDir(`${FTPS_FOLDER.replace(/\/+$/, '')}/${folderName}`)
-    await client.uploadFrom(Readable.from(Buffer.from(report, 'utf8')), 'Meldung.txt')
+    await client.uploadFrom(Readable.from(reportPdf), 'Meldung.pdf')
     uploaded += 1
 
     for (const [index, message] of messages.entries()) {
@@ -192,7 +193,7 @@ export default async function handler(
   res.status(200).json({ ok: true, folder: folderName, files: uploaded, exported_at: exportedAt })
 }
 
-function buildReport(
+async function buildReportPdf(
   ticket: TicketRow,
   messages: MessageRow[],
   names: Map<string, string>,
@@ -200,30 +201,132 @@ function buildReport(
   const status = (ticket.status ?? [])
     .map((entry) => STATUS_LABELS[entry] ?? entry)
     .join(', ')
-  const lines = [
-    `Meldung: ${ticket.title}`,
-    `Gebäude: ${ticket.building_label || '—'}`,
-    `Bereich: ${ticket.unit_location || '—'}`,
-    `Dringlichkeit: ${PRIORITY_LABELS[ticket.priority] ?? ticket.priority}`,
-    `Status: ${status || '—'}`,
-    `Mieter: ${ticket.tenant_name || '—'}`,
-    `Kontakt: ${ticket.contact || '—'}`,
-    `Gemeldet von: ${ticket.reported_by || '—'}`,
-    `Datum: ${formatDate(ticket.occurred_at || ticket.created_at)}`,
-    `Versicherungsschaden: ${ticket.insurance_damage ? 'Ja' : 'Nein'}`,
-    `Situation: ${ticket.situation || '—'}`,
-    `Sonstiges: ${ticket.remarks || '—'}`,
-    '',
-    'Chat:',
-  ]
+  const doc = await PDFDocument.create()
+  const font = await doc.embedFont(StandardFonts.Helvetica)
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const pageSize: [number, number] = [595.28, 841.89]
+  const margin = 50
+  const maxWidth = pageSize[0] - margin * 2
+  let page = doc.addPage(pageSize)
+  let y = pageSize[1] - margin
 
-  for (const message of messages) {
-    const author = names.get(message.user_id) || 'Unbekannt'
-    const text = message.content.trim() || (message.media_type === 'video' ? 'Video' : 'Foto')
-    lines.push(`${formatDate(message.created_at)}  ${author}: ${text}`)
+  const ensureSpace = (needed: number) => {
+    if (y - needed >= margin) return
+    page = doc.addPage(pageSize)
+    y = pageSize[1] - margin
   }
 
-  return `${lines.join('\n')}\n`
+  const write = (text: string, used: PDFFont, size: number, extraGap = 4) => {
+    const lines = wrapPdfText(pdfSafe(text), used, size, maxWidth)
+    for (const line of lines) {
+      ensureSpace(size + extraGap)
+      page.drawText(line, {
+        x: margin,
+        y: y - size,
+        size,
+        font: used,
+        color: rgb(0.12, 0.12, 0.12),
+      })
+      y -= size + extraGap
+    }
+  }
+
+  write('Kithan Problemraum', fontBold, 16, 8)
+  write(ticket.title || 'Meldung', fontBold, 13, 14)
+
+  const fields: Array<[string, string]> = [
+    ['Gebäude', ticket.building_label || '-'],
+    ['Bereich', ticket.unit_location || '-'],
+    ['Dringlichkeit', PRIORITY_LABELS[ticket.priority] ?? ticket.priority],
+    ['Status', status || '-'],
+    ['Mieter', ticket.tenant_name || '-'],
+    ['Kontakt', ticket.contact || '-'],
+    ['Gemeldet von', ticket.reported_by || '-'],
+    ['Datum', formatDate(ticket.occurred_at || ticket.created_at)],
+    ['Versicherungsschaden', ticket.insurance_damage ? 'Ja' : 'Nein'],
+    ['Situation', ticket.situation || '-'],
+    ['Sonstiges', ticket.remarks || '-'],
+  ]
+
+  for (const [label, value] of fields) {
+    write(`${label}: ${value}`, font, 11, 5)
+  }
+
+  y -= 8
+  write('Chat', fontBold, 13, 8)
+
+  if (messages.length === 0) {
+    write('Keine Nachrichten.', font, 11, 5)
+  } else {
+    for (const message of messages) {
+      const author = names.get(message.user_id) || 'Unbekannt'
+      const text =
+        message.content.trim() ||
+        (message.media_type === 'video' ? 'Video' : message.media_type === 'image' ? 'Foto' : 'Nachricht')
+      write(`${formatDate(message.created_at)}  ${author}: ${text}`, font, 11, 5)
+    }
+  }
+
+  const pages = doc.getPages()
+  pages.forEach((entry: PDFPage, index: number) => {
+    entry.drawText(`${index + 1} / ${pages.length}`, {
+      x: pageSize[0] - margin - 40,
+      y: 24,
+      size: 9,
+      font,
+      color: rgb(0.4, 0.4, 0.4),
+    })
+  })
+
+  return Buffer.from(await doc.save())
+}
+
+function wrapPdfText(text: string, font: PDFFont, size: number, maxWidth: number) {
+  const words = text.split(/\s+/).filter(Boolean)
+  if (words.length === 0) return ['-']
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word
+    if (font.widthOfTextAtSize(next, size) <= maxWidth) {
+      current = next
+      continue
+    }
+    if (current) lines.push(current)
+    if (font.widthOfTextAtSize(word, size) <= maxWidth) {
+      current = word
+      continue
+    }
+    let chunk = ''
+    for (const char of word) {
+      const trial = `${chunk}${char}`
+      if (font.widthOfTextAtSize(trial, size) <= maxWidth) {
+        chunk = trial
+      } else {
+        if (chunk) lines.push(chunk)
+        chunk = char
+      }
+    }
+    current = chunk
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
+function pdfSafe(value: string) {
+  return [...value]
+    .map((char) => {
+      if (char === '—' || char === '–') return '-'
+      if (char === '„' || char === '“' || char === '”') return '"'
+      if (char === '‘' || char === '’') return "'"
+      const code = char.charCodeAt(0)
+      if (code === 10 || code === 13) return ' '
+      if (code < 32) return ''
+      if (code <= 126 || 'äöüÄÖÜß'.includes(char)) return char
+      if (code <= 255) return char
+      return '?'
+    })
+    .join('')
 }
 
 function ticketFolderName(ticket: TicketRow) {
