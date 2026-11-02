@@ -20,7 +20,7 @@ export function IosToggle({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex items-center gap-2 disabled:opacity-40"
+      className="flex shrink-0 items-center gap-2 disabled:opacity-40"
     >
       <span
         className={`relative h-8 w-[52px] shrink-0 rounded-full transition-colors ${

@@ -10,6 +10,7 @@ import { getObjektLabel, OBJEKTE } from '../../lib/objekte'
 import { isoToDateInput, isoToTimeInput, parseOccurredAt, updateTicketDetails } from '../../lib/tickets'
 import type { Ticket, TicketPriority, TicketStatus } from '../../types'
 import { InsuranceFields } from '../tickets/InsuranceFields'
+import { FixedSheet } from '../ui/FixedSheet'
 
 interface EditTicketModalProps {
   ticket: Ticket
@@ -89,12 +90,12 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
+    <FixedSheet>
       <form
         onSubmit={(event) => void handleSubmit(event)}
         role="dialog"
         aria-labelledby="edit-ticket-title"
-        className="flex max-h-[90svh] w-full max-w-sm flex-col rounded-2xl border border-neutral-800 bg-neutral-950 p-4 text-white shadow-xl"
+        className="flex max-h-full w-full min-w-0 max-w-sm flex-col overflow-hidden overscroll-none rounded-2xl border border-neutral-800 bg-neutral-950 p-4 text-white shadow-xl"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 id="edit-ticket-title" className="text-base font-semibold">
@@ -109,7 +110,10 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
+        <div
+          data-sheet-scroll
+          className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto overscroll-none [touch-action:pan-y]"
+        >
           <label className="flex flex-col gap-2">
             <span className="text-sm font-medium text-neutral-200">Meldung/Problem</span>
             <input
@@ -117,7 +121,6 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               required
-              autoFocus
               disabled={saving}
               className={FIELD_CLASS}
             />
@@ -303,6 +306,6 @@ export function EditTicketModal({ ticket, onClose, onSaved }: EditTicketModalPro
           </button>
         </div>
       </form>
-    </div>
+    </FixedSheet>
   )
 }
